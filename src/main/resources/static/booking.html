@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Book Concert</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<section class="home">
+    <div class="home-content">
+        <h1>Book Your Concert</h1>
+
+        <p><strong>Name:</strong> <span id="userName"></span></p>
+        <p><strong>Region:</strong> <span id="userRegion"></span></p>
+
+        <label for="concertSelect">Choose a concert:</label><br />
+        <select id="concertSelect">
+            <!-- Options will be loaded dynamically -->
+        </select>
+
+        <p><strong>Price:</strong> $<span id="concertPrice">0</span></p>
+        <p><strong>Available Seats:</strong> <span id="availableSeats">0</span></p>
+
+        <form id="paymentForm">
+            <label for="proof">Upload payment screenshot:</label><br />
+            <input type="file" id="proof" accept="image/*" required /><br /><br />
+            <button type="submit" class="btn">Submit Booking</button>
+        </form>
+    </div>
+</section>
+
+<script>
+    const backendUrl = "http://localhost:8081";
+
+    const userName = localStorage.getItem("fullName") || "Unknown";
+    const userRegion = localStorage.getItem("region") || "Unknown";
+    const userEmail = localStorage.getItem("userEmail") || "";
+
+    document.getElementById("userName").textContent = userName;
+    document.getElementById("userRegion").textContent = userRegion;
+
+    const concertSelect = document.getElementById("concertSelect");
+    const concertPrice = document.getElementById("concertPrice");
+    const availableSeatsSpan = document.getElementById("availableSeats");
+
+    let concerts = [];
+
+    async function loadConcerts() {
+        try {
+            const res = await fetch(`${backendUrl}/concerts`);
+            concerts = await res.json();
+
+            concertSelect.innerHTML = "";
+            concerts.forEach(c => {
+                const option = document.createElement("option");
+                option.value = c.id;
+                option.textContent = `${c.title} — $${c.price}`;
+                option.dataset.price = c.price;
+                option.dataset.seats = c.availableSeats;
+                concertSelect.appendChild(option);
+            });
+
+            updateConcertInfo();
+
+        } catch (err) {
+            console.error("Error loading concerts:", err);
+            alert("Failed to load concerts.");
+        }
+    }
+
+    function updateConcertInfo() {
+        const selected = concertSelect.options[concertSelect.selectedIndex];
+        concertPrice.textContent = selected.dataset.price;
+        availableSeatsSpan.textContent = selected.dataset.seats;
+    }
+
+    concertSelect.addEventListener("change", updateConcertInfo);
+
+    document.getElementById("paymentForm").addEventListener("submit", async e => {
+        e.preventDefault();
+
+        const selected = concertSelect.options[concertSelect.selectedIndex];
+        const concertId = selected.value;
+        const availableSeats = parseInt(selected.dataset.seats);
+
+        if (!userEmail) {
+            alert("Please log in again.");
+            return;
+        }
+
+        if (availableSeats <= 0) {
+            alert("This concert is fully booked.");
+            return;
+        }
+
+        const file = document.getElementById("proof").files[0];
+        if (!file) {
+            alert("Please upload a payment screenshot.");
+            return;
+        }
+
+        try {
+            // 1️⃣ Upload payment proof
+            const formData = new FormData();
+            formData.append("proof", file);
+            formData.append("userEmail", userEmail);
+            formData.append("concertId", concertId);
+            formData.append("price", parseFloat(selected.dataset.price));
+
+            const paymentRes = await fetch(`${backendUrl}/payments`, {
+                method: "POST",
+                body: formData
+            });
+
+            if (!paymentRes.ok) {
+                const msg = await paymentRes.text();
+                alert("Payment failed: " + msg);
+                return;
+            }
+
+            // 2️⃣ Create booking
+            const bookingRes = await fetch(`${backendUrl}/bookings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userEmail, concertId })
+            });
+
+            if (!bookingRes.ok) {
+                const msg = await bookingRes.text();
+                alert("Booking failed: " + msg);
+                return;
+            }
+
+            const bookingData = await bookingRes.json();
+
+            localStorage.setItem("bookedConcert", selected.textContent);
+            localStorage.setItem("seatNumber", bookingData.seatNumber);
+            localStorage.setItem("status", bookingData.status);
+
+            // Redirect to success page
+            window.location.href = "success.html";
+
+        } catch (err) {
+            console.error(err);
+            alert("Something went wrong. Try again.");
+        }
+    });
+
+    // Initial load
+    loadConcerts();
+</script>
+
+</body>
+</html>

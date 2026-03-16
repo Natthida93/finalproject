@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login | Concert Booking</title>
+    <style>
+        body {
+          font-family: 'Segoe UI', Arial, sans-serif;
+          background-color: #f0f2f5;
+          text-align: center;
+          padding-top: 80px;
+        }
+        form {
+          background: white;
+          display: inline-block;
+          padding: 30px;
+          border-radius: 10px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          width: 300px;
+        }
+        h1 {
+          margin-bottom: 20px;
+          color: #333;
+        }
+        input {
+          display: block;
+          margin: 10px auto;
+          padding: 10px;
+          width: 250px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+        }
+        button {
+          margin-top: 15px;
+          padding: 10px 20px;
+          background: #333;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        button:hover {
+          background: #000;
+        }
+        .back-btn {
+          display: block;
+          margin-top: 10px;
+          font-size: 14px;
+          text-decoration: none;
+          color: #007bff;
+        }
+        .back-btn:hover {
+          text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<form id="adminLoginForm">
+    <h1>Admin Login</h1>
+    <input type="email" id="email" placeholder="Admin Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <button type="submit">Login</button>
+    <a href="login.html" class="back-btn">← Back to User Login</a>
+</form>
+
+<script>
+    const backendUrl = "http://localhost:8081";
+
+    document.getElementById("adminLoginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        const res = await fetch(`${backendUrl}/admin/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        const text = await res.text();
+
+        if (text === "ADMIN_LOGIN_SUCCESS") {
+          alert("Welcome, Admin!");
+          localStorage.setItem("isAdmin", true);
+          window.location.href = "admin-dashboard.html";
+        } else {
+          alert("Invalid admin credentials.");
+        }
+      } catch (err) {
+        console.error("Error during admin login:", err);
+        alert("Error connecting to server.");
+      }
+    });
+</script>
+
+</body>
+</html>

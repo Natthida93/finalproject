@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Concert Booking</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .login-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 4rem;
+            background: var(--bg-color);
+            color: var(--text-bg-color);
+        }
+
+        .login-section h1 {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+
+        .login-section h2 {
+            font-size: 2.4rem;
+            margin-bottom: 3rem;
+            color: var(--main-color);
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            background: var(--second-bg-color);
+            padding: 4rem;
+            border-radius: 2rem;
+            box-shadow: 0 0 3rem rgba(0, 255, 255, 0.2);
+            width: 90%;
+            max-width: 450px;
+        }
+
+        .login-form input {
+            padding: 1.8rem;
+            font-size: 1.8rem;
+            border-radius: 1rem;
+            border: none;
+            outline: none;
+            background: var(--bg-color);
+            color: var(--text-bg-color);
+        }
+
+        .login-form button {
+            padding: 1.8rem;
+            font-size: 1.8rem;
+            background: var(--main-color);
+            color: var(--bg-color);
+            font-weight: bold;
+            border-radius: 4rem;
+            cursor: pointer;
+            box-shadow: 0 0 1.5rem var(--main-color);
+            transition: 0.3s ease;
+        }
+
+        .login-form button:hover {
+            background: #00e0e0;
+        }
+
+        .login-form .link {
+            font-size: 1.6rem;
+            color: var(--main-color);
+            text-align: center;
+        }
+
+        .login-form .link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<section class="login-section">
+    <h1>Welcome</h1>
+    <h2>Login to Book Your Concert</h2>
+
+    <form class="login-form" onsubmit="loginUser(event)">
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+        <a href="register.html" class="link">Don't have an account? Sign up</a>
+        <a href="admin-login.html" class="link">Login as Admin</a>
+    </form>
+</section>
+
+<script>
+    const backendUrl = "http://localhost:8081"; // your backend
+
+    async function loginUser(event) {
+        event.preventDefault();
+
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        try {
+            const response = await fetch(`${backendUrl}/users/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json(); // ✅ parse JSON
+
+            if (data.status === "USER_LOGIN_SUCCESS") {
+                const user = data.user;
+
+                // Save user info in localStorage
+                localStorage.setItem("fullName", user.fullName);
+                localStorage.setItem("region", user.region);
+                localStorage.setItem("userEmail", user.email);
+
+                // Redirect to dashboard page
+                window.location.href = "dashboard.html";
+
+            } else if (data.status === "ADMIN_LOGIN_SUCCESS") {
+                localStorage.setItem("isAdmin", true);
+                alert("Welcome, Admin!");
+                window.location.href = "admin-dashboard.html";
+
+            } else {
+                alert(data.message || "Login failed. Check your email or password.");
+            }
+        } catch (err) {
+            console.error("Login error:", err);
+            alert("An error occurred. Please check your connection.");
+        }
+    }
+</script>
+</body>
+</html>

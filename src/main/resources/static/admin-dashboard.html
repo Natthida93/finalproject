@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        header .logout-btn {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            background: #dc3545;
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.3s ease;
+        }
+
+        header .logout-btn:hover {
+            background: #b02a37;
+        }
+
+        .refresh-btn {
+            background: #28a745;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+            font-size: 1rem;
+        }
+
+        table {
+            width: 95%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background: #f1f1f1;
+        }
+
+        button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #b02a37;
+        }
+
+        select {
+            padding: 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Admin Dashboard</h1>
+    <p>Manage Bookings & Payment Status</p>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+</header>
+
+<button class="refresh-btn" onclick="loadBookings()">🔄 Refresh Data</button>
+
+<table id="bookingTable">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>User</th>
+        <th>Email</th>
+        <th>Concert</th>
+        <th>Seat</th>
+        <th>Status</th>
+        <th>Booking Time</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody id="bookingData">
+    <!-- Auto-loaded rows -->
+    </tbody>
+</table>
+
+<script>
+    const backendUrl = "http://localhost:8081";
+
+    /** 🔄 Load All Bookings */
+    async function loadBookings() {
+        try {
+            const res = await fetch(`${backendUrl}/bookings`);
+            const bookings = await res.json();
+
+            const tbody = document.getElementById("bookingData");
+            tbody.innerHTML = "";
+
+            bookings.forEach(b => {
+                const row = document.createElement("tr");
+
+                const bookingTime = b.bookingTime
+                    ? b.bookingTime.replace("T", " ").slice(0, 16)
+                    : "-";
+
+                row.innerHTML = `
+                    <td>${b.id}</td>
+                    <td>${b.user?.fullName || "-"}</td>
+                    <td>${b.user?.email || "-"}</td>
+                    <td>${b.concert?.title || "N/A"}</td>
+                    <td>${b.seatNumber || "-"}</td>
+
+                    <td>
+                        <select onchange="updateStatus(${b.id}, this.value)">
+                            <option value="Pending" ${b.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="Paid" ${b.status === 'Paid' ? 'selected' : ''}>Paid</option>
+                            <option value="Cancelled" ${b.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                        </select>
+                    </td>
+
+                    <td>${bookingTime}</td>
+
+                    <td>
+                        <button class="btn-delete" onclick="deleteBooking(${b.id})">Delete</button>
+                    </td>
+                `;
+
+                tbody.appendChild(row);
+            });
+
+        } catch (err) {
+            console.error("Error loading bookings:", err);
+            alert("Failed to load bookings.");
+        }
+    }
+
+    /** 🟡 Update Payment Status */
+    async function updateStatus(id, newStatus) {
+        try {
+            const res = await fetch(`${backendUrl}/bookings/${id}/payment`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (res.ok) {
+                alert("Status updated!");
+                loadBookings();
+            } else {
+                alert("Failed to update status.");
+            }
+        } catch (err) {
+            alert("Error updating status.");
+        }
+    }
+
+    /** ❌ Delete Booking (and auto-return seat in SQL) */
+    async function deleteBooking(id) {
+        if (!confirm("Delete this booking?")) return;
+
+        try {
+            const res = await fetch(`${backendUrl}/bookings/${id}`, {
+                method: "DELETE"
+            });
+
+            if (res.ok) {
+                alert("Booking deleted!");
+                loadBookings();
+            } else {
+                alert("Failed to delete booking.");
+            }
+        } catch (err) {
+            alert("Error deleting booking.");
+        }
+    }
+
+    /** 🚪 Logout */
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isAdmin");
+        window.location.href = "login.html";
+    });
+
+    // Auto-load on start
+    loadBookings();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Concert Booking</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 🔙 Back button (smaller + bottom-right placed) */
+        .back-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #00e0e0;
+            color: #0f0f0f;
+            padding: 0.8rem 1.4rem;
+            border-radius: 1rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-decoration: none;
+            box-shadow: 0 0 0.8rem #00e0e0;
+            transition: 0.3s ease;
+            z-index: 999;
+        }
+
+        .back-btn:hover {
+            background: #00c0c0;
+            box-shadow: 0 0 1.5rem #00c0c0;
+        }
+
+        .dashboard-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 6rem 9%;
+            text-align: center;
+        }
+
+        .dashboard-section h1 {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-section p {
+            font-size: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .dashboard-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .dashboard-buttons a {
+            padding: 1.8rem 3rem;
+            font-size: 2rem;
+            border-radius: 2rem;
+            background: #00e0e0;
+            color: #0f0f0f;
+            font-weight: bold;
+            text-decoration: none;
+            transition: 0.3s ease;
+            box-shadow: 0 0 1.5rem #00e0e0;
+        }
+
+        .dashboard-buttons a:hover {
+            background: #00c0c0;
+            box-shadow: 0 0 2rem #00c0c0;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-buttons a {
+                font-size: 1.6rem;
+                padding: 1.5rem 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<section class="dashboard-section">
+    <h1>Welcome, <span id="userName"></span>!</h1>
+    <p>What would you like to do today?</p>
+
+    <div class="dashboard-buttons">
+        <a href="booking.html">Book a Concert</a>
+        <a href="history.html">View Booking History</a>
+    </div>
+</section>
+
+
+
+<script>
+    const fullName = localStorage.getItem("fullName") || "User";
+    document.getElementById("userName").textContent = fullName;
+</script>
+
+</body>
+</html>

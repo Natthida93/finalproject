@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking History | Concert Booking</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .history-section {
+            padding: 6rem 9%;
+            color: #fff;
+            text-align: center;
+        }
+
+        .history-section h1 {
+            font-size: 4rem;
+            margin-bottom: 3rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 2rem;
+        }
+
+        th, td {
+            padding: 1.5rem;
+            text-align: center;
+            border: 0.1rem solid #fff;
+        }
+
+        th {
+            background: #222;
+            font-size: 2.2rem;
+        }
+
+        tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .no-history {
+            font-size: 2rem;
+            margin-top: 2rem;
+        }
+
+        .logout-btn {
+            margin-top: 3rem;
+            padding: 1.5rem 3rem;
+            font-size: 2rem;
+            border-radius: 2rem;
+            background: #ff4b5c;
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #e03b4b;
+        }
+
+        @media (max-width: 768px) {
+            table, th, td {
+                font-size: 1.6rem;
+            }
+            .logout-btn {
+                font-size: 1.6rem;
+                padding: 1.2rem 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<section class="history-section">
+    <h1>Your Booking History</h1>
+
+    <table id="historyTable">
+        <thead>
+        <tr>
+            <th>Concert Name</th>
+            <th>Seat Number</th>
+            <th>Status</th>
+            <th>Price</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!-- History rows will be inserted here dynamically -->
+        </tbody>
+    </table>
+
+    <div class="no-history" id="noHistory" style="display: none;">No bookings found.</div>
+
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+</section>
+
+<a class="back-btn" href="booking.html">← Back</a>
+
+<script>
+    const backendUrl = "http://localhost:8081"; // backend URL
+
+    async function loadBookingHistory() {
+        const userEmail = localStorage.getItem("userEmail");
+
+        if (!userEmail) {
+            alert("You must log in first!");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            const response = await fetch(`${backendUrl}/bookings/history/${userEmail}`);
+            if (!response.ok) throw new Error("Failed to fetch booking history");
+
+            const data = await response.json();
+
+            const tbody = document.querySelector("#historyTable tbody");
+            tbody.innerHTML = "";
+
+            if (data.length === 0) {
+                document.getElementById("noHistory").style.display = "block";
+                return;
+            }
+
+            data.forEach(booking => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${booking.concertName}</td>
+                    <td>${booking.seatNumber}</td>
+                    <td>${booking.status}</td>
+                    <td>$${booking.price}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+        } catch (err) {
+            console.error(err);
+            alert("Error loading booking history.");
+        }
+    }
+
+    // Load history when page loads
+    window.addEventListener("DOMContentLoaded", loadBookingHistory);
+
+    // Logout functionality
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.clear(); // clear user info
+        window.location.href = "login.html"; // redirect to login
+    });
+</script>
+
+</body>
+</html>

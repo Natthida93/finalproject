@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register | Concert Booking</title>
+    <style>
+        body {
+          font-family: 'Segoe UI', Arial, sans-serif;
+          background-color: #f0f2f5;
+          text-align: center;
+          padding-top: 80px;
+        }
+        form {
+          background: white;
+          display: inline-block;
+          padding: 30px;
+          border-radius: 10px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          width: 300px;
+        }
+        h1 { margin-bottom: 20px; color: #333; }
+        input {
+          display: block;
+          margin: 10px auto;
+          padding: 10px;
+          width: 250px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+        }
+        button {
+          margin-top: 15px;
+          padding: 10px 20px;
+          background: #28a745;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        button:hover {
+          background: #218838;
+        }
+        .link {
+          display: block;
+          margin-top: 10px;
+          font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<form onsubmit="registerUser(event)">
+    <h1>Sign Up</h1>
+    <input type="text" id="fullName" placeholder="Full Name" required>
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <input type="text" id="region" placeholder="Region" required>
+    <button type="submit">Register</button>
+    <a href="login.html" class="link">Already have an account? Login</a>
+</form>
+
+<script>
+    async function registerUser(event) {
+      event.preventDefault();
+
+      const fullName = document.getElementById('fullName').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const region = document.getElementById('region').value;
+
+      const response = await fetch('/users/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName, email, password, region })
+      });
+
+      const text = await response.text();
+
+      if (text.includes('successful')) {
+        alert('Registration successful! You can now log in.');
+        window.location.href = '/login.html';
+      } else {
+        alert(text);
+      }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Booking Successful</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        body {
+          font-family: 'Segoe UI', sans-serif;
+          background: #f0f8ff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          margin: 0;
+        }
+
+        .success-container {
+          background: #fff;
+          padding: 40px 60px;
+          border-radius: 12px;
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+          text-align: center;
+          animation: fadeIn 0.8s ease-in;
+        }
+
+        .success-container h1 {
+          color: #28a745;
+          font-size: 2.5rem;
+        }
+
+        .success-container p {
+          font-size: 1.2rem;
+          margin-top: 10px;
+          color: #333;
+        }
+
+        .success-container .btn {
+          display: inline-block;
+          margin: 15px 10px 0 10px;
+          padding: 10px 20px;
+          background: #007bff;
+          color: #fff;
+          text-decoration: none;
+          border-radius: 8px;
+        }
+
+        .success-container .btn:hover {
+          background: #0056b3;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+<div class="success-container">
+    <h1>✅ Booking Successful!</h1>
+    <p id="message">Thank you for booking. We’ve received your payment proof.</p>
+    <a href="login.html" class="btn">Back to Home</a>
+    <a href="history.html" class="btn">View Booking History</a>
+</div>
+
+<script>
+    const concertName = localStorage.getItem("bookedConcert");
+    if (concertName) {
+      document.getElementById("message").textContent =
+        `Thank you for booking "${concertName}". We’ve received your payment proof.`;
+      localStorage.removeItem("bookedConcert"); // cleanup
+    }
+
+    // ✅ Automatically redirect to history page after 5 seconds
+    setTimeout(() => {
+        window.location.href = "history.html";
+    }, 5000); // 5000 ms = 5 seconds
+</script>
+
+</body>
+</html>
