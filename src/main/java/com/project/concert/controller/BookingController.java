@@ -113,15 +113,16 @@ public class BookingController {
     // ================= GET BOOKING BY PAYMENT =================
     @GetMapping("/by-payment/{paymentId}")
     public ResponseEntity<?> getBookingByPayment(@PathVariable Long paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElse(null);
-        if (payment == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Payment not found");
 
-        Booking booking = bookingRepository.findByPayment(payment)
-                .orElse(null);
-        if (booking == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Booking not found");
+        Optional<Booking> optionalBooking =
+                bookingRepository.findByPayment_Id(paymentId);
 
-        return ResponseEntity.ok(booking);
+        if (optionalBooking.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Booking not found");
+        }
+
+        return ResponseEntity.ok(optionalBooking.get());
     }
 
     // ================= USER BOOKING HISTORY =================

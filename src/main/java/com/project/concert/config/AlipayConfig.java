@@ -20,9 +20,5 @@ public class AlipayConfig {
     public static final String CHARSET = "UTF-8";
     public static final String FORMAT = "json";
     public static final String SIGN_TYPE = "RSA2";
-
-  /*  public static final String NOTIFY_URL =
-            "http://localhost:8081/bookings/pay/notify";*/
-  public static final String NOTIFY_URL =
-          "https://gangliest-stacey-minutial.ngrok-free.dev/payment/notify";
+  public static final String NOTIFY_URL = "https://gangliest-stacey-minutial.ngrok-free.dev/payment/notify";
 }

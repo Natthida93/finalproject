@@ -1,5 +1,6 @@
 package com.project.concert.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
@@ -19,10 +20,12 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concert_id", nullable = false)
+    @JsonIgnore
     private Concert concert;
 
     @ManyToMany(fetch = FetchType.LAZY)
@@ -31,6 +34,7 @@ public class Payment {
             joinColumns = @JoinColumn(name = "payment_id"),
             inverseJoinColumns = @JoinColumn(name = "seat_id")
     )
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Set<Seat> seats = new HashSet<>();
 
     // Store seat numbers for quick display

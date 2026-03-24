@@ -1,5 +1,6 @@
 package com.project.concert.model;
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "users")

@@ -31,8 +31,8 @@ public class Concert {
     @Column(name = "available_seats")
     private Integer availableSeats;
 
-    @OneToMany(mappedBy = "concert", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Section> sections;
 
     public Long getId() {

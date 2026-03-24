@@ -28,8 +28,8 @@ public class Section {
     private Concert concert;
 
     // ===== Relationship to Seats =====
-    @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Seat> seats;
 
     public Section() {}
