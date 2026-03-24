@@ -78,7 +78,6 @@ public class SeatController {
             payment.setSeats(Set.of(seat));
             payment.setPrice(seat.getPrice() != null ? seat.getPrice() : 0.0);
             payment.setDeliveryMethod("CONCERT");
-            payment.setProofUrl(null);
             payment.setShippingAddress(null);
             payment.setUserIdNumber(null);
 

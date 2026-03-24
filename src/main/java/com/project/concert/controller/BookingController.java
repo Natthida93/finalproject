@@ -13,6 +13,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/bookings")
+@CrossOrigin(origins = "*")
 public class BookingController {
 
     private final SeatService seatService;
@@ -20,14 +21,19 @@ public class BookingController {
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
 
+    private final  ConcertRepository concertRepository;
+
+
     public BookingController(SeatService seatService,
                              BookingRepository bookingRepository,
                              UserRepository userRepository,
-                             PaymentRepository paymentRepository) {
+                             PaymentRepository paymentRepository,
+                             ConcertRepository concertRepository) {
         this.seatService = seatService;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
+        this.concertRepository = concertRepository;
     }
 
     // ================= LOCK SEATS =================
@@ -48,6 +54,7 @@ public class BookingController {
                 seat.setStatus(SeatStatus.LOCKED);
                 seat.setLockedById(user.getId());
                 seat.setLockedUntil(LocalDateTime.now().plusMinutes(5));
+
                 seatService.saveSeat(seat);
                 lockedSeats.add(seat);
             }
@@ -66,67 +73,150 @@ public class BookingController {
             Payment payment = paymentRepository.findById(request.getPaymentId())
                     .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-
             if (payment.getStatus() != PaymentStatus.COMPLETED) {
                 throw new RuntimeException("Payment not completed yet");
             }
 
             Set<Seat> seats = payment.getSeats();
-            List<Booking> bookings = new ArrayList<>();
             for (Seat seat : seats) {
-                if (seat.getStatus() != SeatStatus.LOCKED || !seat.getLockedById().equals(payment.getUser().getId())) {
-                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not properly locked for this user");
+                if (seat.getLockedById() == null ||
+                        !seat.getLockedById().equals(payment.getUser().getId())) {
+                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not locked for this user");
                 }
 
-                // Mark seat as booked
+                if (seat.getStatus() != SeatStatus.LOCKED) {
+                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not locked");
+                }
+
                 seat.setStatus(SeatStatus.BOOKED);
                 seat.setLockedById(null);
                 seat.setLockedUntil(null);
                 seatService.saveSeat(seat);
-
-                // Create booking record
-                Booking booking = new Booking();
-                booking.setUser(payment.getUser());
-                booking.setConcert(seat.getConcert());
-                booking.setSeatId(seat.getId());
-                booking.setSeatNumber(seat.getSeatNumber());
-                booking.setZoneName(seat.getSection().getName());
-                booking.setTotalPrice(seat.getPrice() != null ? seat.getPrice() : 0);
-                booking.setStatus("CONFIRMED");
-                booking.setDeliveryMethod(payment.getDeliveryMethod());
-                bookingRepository.save(booking);
-                bookings.add(booking);
             }
 
-            return ResponseEntity.ok(bookings);
+            // === FIX: Explicitly set bookedAt to avoid DB default error ===
+            Booking booking = new Booking();
+            booking.setUser(payment.getUser());
+            booking.setConcert(payment.getConcert());
+            booking.setSeats(seats);
+            booking.setPayment(payment);
+            booking.setBookedAt(LocalDateTime.now()); // <-- explicitly set booking time
+
+            bookingRepository.save(booking);
+
+            return ResponseEntity.ok(booking);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         }
     }
+
+    // ================= GET BOOKING BY PAYMENT =================
+    @GetMapping("/by-payment/{paymentId}")
+    public ResponseEntity<?> getBookingByPayment(@PathVariable Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElse(null);
+        if (payment == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Payment not found");
+
+        Booking booking = bookingRepository.findByPayment(payment)
+                .orElse(null);
+        if (booking == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Booking not found");
+
+        return ResponseEntity.ok(booking);
+    }
+
     // ================= USER BOOKING HISTORY =================
     @GetMapping("/history/{userEmail}")
     public ResponseEntity<?> getUserBookingHistory(@PathVariable String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElse(null);
-        if(user == null)
+        User user = userRepository.findByEmail(userEmail).orElse(null);
+        if (user == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
 
         List<Booking> bookings = bookingRepository.findByUser(user);
-        List<Map<String,Object>> history = new ArrayList<>();
+        List<Map<String, Object>> history = new ArrayList<>();
 
-        for(Booking b : bookings){
-            Map<String,Object> item = new HashMap<>();
+        for (Booking b : bookings) {
+            Map<String, Object> item = new HashMap<>();
+            // Include concert ID for frontend
+            item.put("concertId", b.getConcert().getId());
             item.put("concertName", b.getConcert().getTitle());
             item.put("concertDate", b.getConcert().getDate());
-            item.put("seatNumber", b.getSeatNumber());
-            item.put("zoneName", b.getZoneName());
-            item.put("totalPrice", b.getTotalPrice());
-            item.put("status", b.getStatus());
-            item.put("deliveryMethod", b.getDeliveryMethod());
+
+            // Include payment ID for polling
+            item.put("paymentId", b.getPayment().getId());
+            item.put("paymentStatus", b.getPayment().getStatus().name());
+
+            item.put("totalPrice", b.getSeats().stream().mapToDouble(Seat::getPrice).sum());
+
+            List<Map<String, Object>> seatsInfo = new ArrayList<>();
+            for (Seat s : b.getSeats()) {
+                Map<String, Object> seatMap = new HashMap<>();
+                seatMap.put("seatNumber", s.getSeatNumber());
+                seatMap.put("section", s.getSection().getName());
+                seatMap.put("price", s.getPrice());
+                seatsInfo.add(seatMap);
+            }
+            item.put("seats", seatsInfo);
+            item.put("bookedAt", b.getBookedAt());
+
             history.add(item);
         }
 
         return ResponseEntity.ok(history);
+    }
+
+    @PostMapping("/alipay")
+    public ResponseEntity<?> payWithAlipay(@RequestBody Map<String, Object> payload) {
+        try {
+            Long userId = Long.valueOf(payload.get("userId").toString());
+            Long concertId = Long.valueOf(payload.get("concertId").toString());
+            Double totalPrice = Double.valueOf(payload.get("price").toString()); // Use your price field
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            Concert concert = concertRepository.findById(concertId)
+                    .orElseThrow(() -> new RuntimeException("Concert not found"));
+
+            Payment payment = new Payment();
+            payment.setUser(user);
+            payment.setConcert(concert);
+            payment.setPrice(totalPrice);
+            payment.setStatus(PaymentStatus.PENDING);
+            paymentRepository.save(payment);
+
+            // Generate sandbox QR code
+            String qrCodeUrl = "https://via.placeholder.com/200?text=Alipay+Sandbox+QR";
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("qrCodeUrl", qrCodeUrl);
+            response.put("paymentId", payment.getId());
+
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
+    }
+    // 2️⃣ Handle Alipay notify callback
+    @PostMapping("/alipay/notify")
+    public ResponseEntity<String> handleAlipayNotify(@RequestParam Long paymentId,
+                                                     @RequestParam String tradeStatus) {
+        Optional<Payment> optionalPayment = paymentRepository.findById(paymentId);
+        if (optionalPayment.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Payment not found");
+
+        Payment payment = optionalPayment.get();
+
+        if ("TRADE_SUCCESS".equals(tradeStatus)) {
+            payment.setStatus(PaymentStatus.COMPLETED);
+            paymentRepository.save(payment);
+
+            // Optional: automatically confirm booking if you want
+            // You can reuse your confirmBooking() logic here if desired
+
+            return ResponseEntity.ok("SUCCESS");
+        }
+
+        return ResponseEntity.ok("FAILED");
     }
 
     // ================= DTOs =================
@@ -136,7 +226,6 @@ public class BookingController {
 
         public String getUserEmail() { return userEmail; }
         public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
-
         public Set<Long> getSeatIds() { return seatIds; }
         public void setSeatIds(Set<Long> seatIds) { this.seatIds = seatIds; }
     }

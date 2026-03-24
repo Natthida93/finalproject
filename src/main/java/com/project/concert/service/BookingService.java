@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Service
 public class BookingService {
@@ -18,77 +19,50 @@ public class BookingService {
         this.seatService = seatService;
     }
 
-    /**
-     * Create booking by locking the seat first.
-     * Seat will remain LOCKED until payment confirms booking.
-     */
+    /*** Create booking from a set of seats and a payment */
     @Transactional
-    public Booking createBooking(User user, Seat seat) {
+    public Booking createBooking(User user, Concert concert, Set<Seat> seats, Payment payment) {
 
-        // Check if seat is already booked
-        if (seat.getStatus() == SeatStatus.BOOKED) {
-            throw new RuntimeException("Seat already booked");
+        // Check seats availability
+        for (Seat seat : seats) {
+            if (seat.getStatus() == SeatStatus.BOOKED) {
+                throw new RuntimeException("Seat already booked: " + seat.getSeatNumber());
+            }
+            // Optional: check if locked by this user
+            if (seat.getStatus() == SeatStatus.LOCKED &&
+                    !user.getId().equals(seat.getLockedById()) &&
+                    seat.getLockedUntil() != null &&
+                    seat.getLockedUntil().isAfter(LocalDateTime.now())) {
+                throw new RuntimeException("Seat is locked by another user: " + seat.getSeatNumber());
+            }
+
+            // Mark seat as booked
+            seat.setStatus(SeatStatus.BOOKED);
+            seat.setLockedById(null);
+            seat.setLockedUntil(null);
+            seatService.saveSeat(seat);
         }
 
-        // If seat is locked by another user, block
-        if (seat.getStatus() == SeatStatus.LOCKED &&
-                !user.getId().equals(seat.getLockedById()) &&
-                seat.getLockedUntil() != null &&
-                seat.getLockedUntil().isAfter(LocalDateTime.now())) {
-            throw new RuntimeException("Seat is locked by another user");
-        }
-
-        // Lock seat for this user (5 minutes)
-        seat.setStatus(SeatStatus.LOCKED);
-        seat.setLockedById(user.getId());
-        seat.setLockedUntil(LocalDateTime.now().plusMinutes(5));
-        seatService.saveSeat(seat);
-
-        // Create booking record with PENDING status
+        // Create booking record
         Booking booking = new Booking();
         booking.setUser(user);
-        booking.setConcert(seat.getConcert());
-        booking.setSeatId(seat.getId());
-        booking.setSeatNumber(seat.getSeatNumber());
-        booking.setZoneName(seat.getSection().getName());
-        booking.setTotalPrice(seat.getPrice()); // seat already has correct price
-        booking.setStatus("PENDING"); // will become CONFIRMED after payment
+        booking.setConcert(concert);
+        booking.setSeats(seats);
+        booking.setPayment(payment);
 
         return bookingRepository.save(booking);
     }
 
-    /**
-     * Confirm booking after successful payment
-     */
-    @Transactional
-    public Booking confirmBooking(Booking booking) {
-        Seat seat = seatService.getSeatById(booking.getSeatId());
-
-        if (!booking.getUser().getId().equals(seat.getLockedById())) {
-            throw new RuntimeException("Cannot confirm booking: seat locked by another user");
-        }
-
-        seat.setStatus(SeatStatus.BOOKED);
-        seat.setLockedById(null);
-        seat.setLockedUntil(null);
-        seatService.saveSeat(seat);
-
-        booking.setStatus("CONFIRMED");
-        return bookingRepository.save(booking);
-    }
-
-    /**
-     * Cancel booking (release seat)
-     */
+    /*** Cancel a booking (release seats)*/
     @Transactional
     public void cancelBooking(Booking booking) {
-        Seat seat = seatService.getSeatById(booking.getSeatId());
-
-        seat.setStatus(SeatStatus.AVAILABLE);
-        seat.setLockedById(null);
-        seat.setLockedUntil(null);
-        seatService.saveSeat(seat);
-
+        Set<Seat> seats = booking.getSeats();
+        for (Seat seat : seats) {
+            seat.setStatus(SeatStatus.AVAILABLE);
+            seat.setLockedById(null);
+            seat.setLockedUntil(null);
+            seatService.saveSeat(seat);
+        }
         bookingRepository.delete(booking);
     }
 }

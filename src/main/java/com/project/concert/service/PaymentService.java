@@ -6,14 +6,14 @@ import com.project.concert.repository.*;
 import com.alipay.api.AlipayApiException;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.DefaultAlipayClient;
-import com.alipay.api.request.AlipayTradeWapPayRequest;
+import com.alipay.api.request.AlipayTradePrecreateRequest;
+import com.alipay.api.response.AlipayTradePrecreateResponse;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,20 +23,22 @@ public class PaymentService {
     private final SeatRepository seatRepository;
     private final ConcertRepository concertRepository;
     private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
 
     private final AlipayClient alipayClient;
 
     public PaymentService(UserRepository userRepository,
                           SeatRepository seatRepository,
                           ConcertRepository concertRepository,
-                          PaymentRepository paymentRepository) {
+                          PaymentRepository paymentRepository,
+                          BookingRepository bookingRepository) {
 
         this.userRepository = userRepository;
         this.seatRepository = seatRepository;
         this.concertRepository = concertRepository;
         this.paymentRepository = paymentRepository;
+        this.bookingRepository = bookingRepository;
 
-        // Initialize Alipay sandbox client
         this.alipayClient = new DefaultAlipayClient(
                 AlipayConfig.GATEWAY_URL,
                 AlipayConfig.APP_ID,
@@ -48,13 +50,15 @@ public class PaymentService {
         );
     }
 
-    /**
-     * Initiate payment for seats already locked or available.
-     * skipLock = true means seats are already locked and don't need locking again.
-     */
+    // ------------------------
+    // Initiate Payment (UNCHANGED except bug fix)
+    // ------------------------
     @Transactional
-    public Payment initiatePayment(Long userId, List<Long> seatIds, Long concertId, String deliveryMethod, boolean skipLock) {
-        System.out.println("[PaymentService] initiatePayment called");
+    public Payment initiatePayment(Long userId,
+                                   List<Long> seatIds,
+                                   Long concertId,
+                                   String deliveryMethod,
+                                   boolean skipLock) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -63,109 +67,174 @@ public class PaymentService {
                 .orElseThrow(() -> new RuntimeException("Concert not found"));
 
         List<Seat> seats = seatRepository.findAllById(seatIds);
+
         if (seats.size() != seatIds.size()) {
             throw new RuntimeException("Some seats not found");
         }
 
         for (Seat seat : seats) {
-            // Ensure all required fields exist
-            if (seat.getSeatNumber() == null || seat.getPrice() == null
-                    || seat.getConcert() == null || seat.getSection() == null) {
-                throw new RuntimeException("Seat " + seat.getId() + " is incomplete or invalid");
-            }
 
-            // If skipping lock, assume seat is already locked by this user
             if (!skipLock) {
-                if (seat.getStatus() == SeatStatus.LOCKED && !user.getId().equals(seat.getLockedById())) {
+
+                boolean expired = seat.getLockedUntil() == null
+                        || seat.getLockedUntil().isBefore(LocalDateTime.now());
+
+                if (seat.getStatus() == SeatStatus.LOCKED
+                        && !expired
+                        && !user.getId().equals(seat.getLockedById())) {
+
                     throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not available");
                 }
-                if (seat.getStatus() == SeatStatus.AVAILABLE) {
+
+                if (seat.getStatus() == SeatStatus.AVAILABLE || expired) {
+
                     seat.setStatus(SeatStatus.LOCKED);
                     seat.setLockedById(user.getId());
                     seat.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+
                     seatRepository.save(seat);
-                    System.out.println("[PaymentService] Seat locked: " + seat.getSeatNumber());
                 }
             }
         }
 
-        // Calculate total price
-        double totalPrice = seats.stream().mapToDouble(Seat::getPrice).sum();
+        double totalPrice = seats.stream()
+                .mapToDouble(Seat::getPrice)
+                .sum();
 
-        // Create Payment record
+        String seatNumbers = seats.stream()
+                .map(Seat::getSeatNumber)
+                .sorted()
+                .collect(Collectors.joining(","));
+
+        Optional<Payment> existingPayment =
+                paymentRepository.findPendingPayment(
+                        user.getId(),
+                        concert.getId(),
+                        seatNumbers
+                );
+
+        if (existingPayment.isPresent()) {
+            return existingPayment.get();
+        }
+
         Payment payment = new Payment();
+
         payment.setUser(user);
         payment.setConcert(concert);
         payment.setSeats(new HashSet<>(seats));
         payment.setDeliveryMethod(deliveryMethod);
         payment.setPrice(totalPrice);
         payment.setStatus(PaymentStatus.PENDING);
-
-        // ✅ Fix: populate seatNumber to satisfy non-null DB constraint
-        String seatNumbers = seats.stream()
-                .map(Seat::getSeatNumber)
-                .sorted()
-                .collect(Collectors.joining(","));
         payment.setSeatNumber(seatNumbers);
 
-        Payment savedPayment = paymentRepository.save(payment);
-        System.out.println("[PaymentService] Payment created with ID: " + savedPayment.getId() + ", total: " + totalPrice);
 
-        return savedPayment;
+        return paymentRepository.save(payment);
     }
 
-    /**
-     * Generate Alipay sandbox form for payment
-     */
-    public String createPaymentForm(Payment payment) throws AlipayApiException {
-        System.out.println("[PaymentService] Creating Alipay form for Payment ID: " + payment.getId());
 
-        AlipayTradeWapPayRequest request = new AlipayTradeWapPayRequest();
-        request.setReturnUrl("http://localhost:5174/booking-success"); // Frontend redirect
-        request.setNotifyUrl(AlipayConfig.NOTIFY_URL); // Backend notify URL
 
-        String bizContent = "{" +
-                "\"out_trade_no\":\"" + payment.getId() + "\"," +
-                "\"total_amount\":\"" + payment.getPrice() + "\"," +
-                "\"subject\":\"Concert Booking #" + payment.getConcert().getTitle() + "\"," +
-                "\"product_code\":\"QUICK_WAP_PAY\"" +
-                "}";
+    public String createQrCode(Payment payment) throws AlipayApiException {
+
+        AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
+
+        request.setNotifyUrl(AlipayConfig.NOTIFY_URL);
+
+        String bizContent = "{"
+                + "\"out_trade_no\":\"" + payment.getId() + "\","
+                + "\"total_amount\":\"" + String.format("%.2f", payment.getPrice()) + "\","
+                + "\"subject\":\"Concert Booking #" + payment.getConcert().getTitle() + "\","
+                + "\"store_id\":\"STORE001\","
+
+                // 🔥 CRITICAL FIXES
+                + "\"product_code\":\"FACE_TO_FACE_PAYMENT\","
+                + "\"timeout_express\":\"5m\""
+
+                + "}";
+
+        System.out.println("Sending to Alipay: " + bizContent);
+
         request.setBizContent(bizContent);
 
-        String form = alipayClient.pageExecute(request).getBody();
-        System.out.println("[PaymentService] Alipay form HTML generated");
-        return form;
+        AlipayTradePrecreateResponse response = alipayClient.execute(request);
+
+        if (response.isSuccess()) {
+            System.out.println("✅ QR Code created: " + response.getQrCode());
+            return response.getQrCode();
+        } else {
+            System.out.println("❌ Alipay error: " + response.getSubMsg());
+            throw new RuntimeException("QR creation failed: " + response.getSubMsg());
+        }
     }
 
-    /**
-     * Handle Alipay notify callback
-     */
+
+
+    // Handle Notify
+
     @Transactional
     public boolean handleAlipayNotify(Long paymentId, String tradeStatus) {
+
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            return true;
+        }
+
         if ("TRADE_SUCCESS".equalsIgnoreCase(tradeStatus)) {
+
             payment.setStatus(PaymentStatus.COMPLETED);
             payment.setCompletedAt(LocalDateTime.now());
 
-            // Mark seats as BOOKED
-            for (Seat seat : payment.getSeats()) {
+            Set<Seat> seats = payment.getSeats();
+
+            for (Seat seat : seats) {
+
                 seat.setStatus(SeatStatus.BOOKED);
                 seat.setLockedById(null);
                 seat.setLockedUntil(null);
+
                 seatRepository.save(seat);
-                System.out.println("[PaymentService] Seat booked: " + seat.getSeatNumber());
             }
 
+            Booking booking = new Booking();
+
+            booking.setUser(payment.getUser());
+            booking.setConcert(payment.getConcert());
+            booking.setSeats(new HashSet<>(seats));
+            booking.setPayment(payment);
+            booking.setBookedAt(LocalDateTime.now());
+
+            bookingRepository.save(booking);
+
             paymentRepository.save(payment);
-            System.out.println("[PaymentService] Payment marked as COMPLETED");
+
             return true;
-        } else {
-            payment.setStatus(PaymentStatus.FAILED);
-            paymentRepository.save(payment);
-            System.out.println("[PaymentService] Payment marked as FAILED");
-            return false;
         }
+
+        payment.setStatus(PaymentStatus.FAILED);
+        paymentRepository.save(payment);
+
+        return false;
+    }
+
+
+    // Get Pending
+
+    @Transactional(readOnly = true)
+    public List<Payment> getPendingPayments(Long userId, Long concertId) {
+        return paymentRepository.findPendingPaymentsWithSeats(userId, concertId);
+    }
+
+
+
+    // Get Status
+
+    @Transactional(readOnly = true)
+    public String getPaymentStatus(Long paymentId) {
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+
+        return payment.getStatus().name();
     }
 }

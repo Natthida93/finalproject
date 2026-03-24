@@ -1,11 +1,14 @@
 package com.project.concert.model;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "payment")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Payment {
 
     @Id
@@ -14,23 +17,24 @@ public class Payment {
 
     private Double price;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concert_id", nullable = false)
     private Concert concert;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "payment_seats",
             joinColumns = @JoinColumn(name = "payment_id"),
             inverseJoinColumns = @JoinColumn(name = "seat_id")
     )
-    private Set<Seat> seats;
+    private Set<Seat> seats = new HashSet<>();
 
-    @Column(nullable = false)
+    // Store seat numbers for quick display
+    @Column(nullable = true)
     private String seatNumber;
 
     private String deliveryMethod;
@@ -42,10 +46,12 @@ public class Payment {
     @Column(nullable = false)
     private PaymentStatus status = PaymentStatus.PENDING;
 
-    @Column(nullable = false, updatable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     private LocalDateTime completedAt;
+
+
 
     @PrePersist
     protected void onCreate() {
@@ -55,6 +61,7 @@ public class Payment {
     }
 
     // ======== GETTERS / SETTERS ========
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -79,18 +86,17 @@ public class Payment {
     public String getShippingAddress() { return shippingAddress; }
     public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
 
-    public String getUserIdNumber() { return userIdNumber; }
     public void setUserIdNumber(String userIdNumber) { this.userIdNumber = userIdNumber; }
-
-    public String getProofUrl() { return proofUrl; }
-    public void setProofUrl(String proofUrl) { this.proofUrl = proofUrl; }
 
     public PaymentStatus getStatus() { return status; }
     public void setStatus(PaymentStatus status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public LocalDateTime getCompletedAt() { return completedAt; }
-    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+    public String getUserIdNumber() {
+        return userIdNumber;
+    }
 }

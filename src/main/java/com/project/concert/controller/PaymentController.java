@@ -1,14 +1,16 @@
 package com.project.concert.controller;
 
-import com.project.concert.dto.PaymentRequest;
 import com.project.concert.model.Payment;
 import com.project.concert.service.PaymentService;
-import com.alipay.api.AlipayApiException;
+
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/payment")
@@ -21,44 +23,100 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
-    /**
-     * Create payment and return Alipay sandbox form
-     * Seats already locked by this user are allowed
-     */
+    // ---------------- CREATE QR PAYMENT ----------------
     @PostMapping("/create")
-    public ResponseEntity<?> createPayment(@RequestBody PaymentRequest request) {
+    public ResponseEntity<?> createPayment(@RequestBody Map<String, Object> payload) {
+
         try {
+            // ✅ safer parsing
+            if (payload.get("userId") == null ||
+                    payload.get("concertId") == null ||
+                    payload.get("seatIds") == null) {
+                throw new RuntimeException("Missing required payment data");
+            }
+
+            Long userId = Long.valueOf(payload.get("userId").toString());
+            Long concertId = Long.valueOf(payload.get("concertId").toString());
+
+            List<Long> seatIds = ((List<?>) payload.get("seatIds"))
+                    .stream()
+                    .map(id -> Long.valueOf(id.toString()))
+                    .collect(Collectors.toList());
+
+            String deliveryMethod = (String) payload.getOrDefault("deliveryMethod", "CONCERT");
+
+            // ✅ create payment
             Payment payment = paymentService.initiatePayment(
-
-                            request.getUserId(),
-                            new ArrayList<>(request.getSeatIds()), // convert Set to List
-                            request.getConcertId(),
-                            request.getDeliveryMethod(),
-                            true // skipLock
-
+                    userId,
+                    seatIds,
+                    concertId,
+                    deliveryMethod,
+                    true
             );
 
-            String formHtml = paymentService.createPaymentForm(payment);
-            return ResponseEntity.ok(formHtml);
-        } catch (RuntimeException | AlipayApiException e) {
+            System.out.println("[PaymentController] Payment created ID: " + payment.getId());
+
+            // ✅ generate QR
+            String qrCode = paymentService.createQrCode(payment);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("qrCode", qrCode);
+            response.put("paymentId", payment.getId());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage() != null ? e.getMessage() : "Payment creation failed");
         }
     }
-    /**
-     * Alipay notify endpoint
-     * Called by Alipay server after payment completed
-     */
+
+
+    // ---------------- ALIPAY NOTIFY ----------------
     @PostMapping("/notify")
-    public ResponseEntity<String> handleAlipayNotify(@RequestParam Long paymentId,
-                                                     @RequestParam String tradeStatus) {
+    public String handleNotify(HttpServletRequest request) {
+
+        Map<String, String> params = new HashMap<>();
+
+        request.getParameterMap().forEach((key, values) -> {
+            if (values != null && values.length > 0) {
+                params.put(key, values[0]);
+            }
+        });
+
+        System.out.println("[Alipay Notify] params: " + params);
+
         try {
-            boolean success = paymentService.handleAlipayNotify(paymentId, tradeStatus);
-            return ResponseEntity.ok(success ? "SUCCESS" : "FAILED");
-        } catch (RuntimeException e) {
+            String tradeStatus = params.get("trade_status");
+            String orderId = params.get("out_trade_no");
+
+            if (tradeStatus == null || orderId == null) {
+                System.out.println("[Notify] Missing params");
+                return "fail";
+            }
+
+            if ("TRADE_SUCCESS".equalsIgnoreCase(tradeStatus)) {
+                paymentService.handleAlipayNotify(Long.valueOf(orderId), tradeStatus);
+                System.out.println("[Notify] Payment success handled");
+            }
+
+            return "success";
+
+        } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("ERROR: " + e.getMessage());
+            return "fail";
         }
+    }
+
+
+    // ---------------- CHECK PAYMENT STATUS ----------------
+    @GetMapping("/status/{paymentId}")
+    public ResponseEntity<String> getPaymentStatus(@PathVariable Long paymentId) {
+
+        String status = paymentService.getPaymentStatus(paymentId);
+
+        return ResponseEntity.ok(status);
     }
 }

@@ -7,7 +7,9 @@ import com.project.concert.repository.BookingRepository;
 import com.project.concert.repository.PaymentRepository;
 import com.project.concert.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -24,52 +26,63 @@ public class AdminController {
     @Autowired
     private PaymentRepository paymentRepository;
 
-
+    // ================== ADMIN LOGIN ==================
     @PostMapping("/login")
-    public String adminLogin(@RequestBody User admin) {
+    public ResponseEntity<String> adminLogin(@RequestBody User admin) {
         String email = admin.getEmail();
         String password = admin.getPassword();
 
-
         if ("janeadmin@gmail.com".equals(email) && "admin123".equals(password)) {
-            return "ADMIN_LOGIN_SUCCESS";
+            return ResponseEntity.ok("ADMIN_LOGIN_SUCCESS");
         }
-        return "INVALID_ADMIN";
+        return ResponseEntity.status(401).body("INVALID_ADMIN");
     }
 
-    // --- View all users ---
+    // ================== VIEW ALL USERS ==================
     @GetMapping("/users")
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 
-    // --- View all bookings ---
+    // ================== VIEW ALL BOOKINGS ==================
     @GetMapping("/bookings")
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+    public ResponseEntity<List<Booking>> getAllBookings() {
+        return ResponseEntity.ok(bookingRepository.findAll());
     }
 
-    // --- View all payments ---
+    // ================== VIEW ALL PAYMENTS ==================
     @GetMapping("/payments")
-    public List<Payment> getAllPayments() {
-        return paymentRepository.findAll();
+    public ResponseEntity<List<Payment>> getAllPayments() {
+        return ResponseEntity.ok(paymentRepository.findAll());
     }
 
-    // --- Delete a user ---
+    // ================== DELETE USER ==================
     @DeleteMapping("/users/{id}")
-    public void deleteUser(@PathVariable Long id) {
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        if (!userRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
         userRepository.deleteById(id);
+        return ResponseEntity.ok("User deleted successfully");
     }
 
-    // --- Delete a booking ---
+    // ================== DELETE BOOKING ==================
     @DeleteMapping("/bookings/{id}")
-    public void deleteBooking(@PathVariable Long id) {
+    public ResponseEntity<String> deleteBooking(@PathVariable Long id) {
+        if (!bookingRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
         bookingRepository.deleteById(id);
+        return ResponseEntity.ok("Booking deleted successfully");
     }
 
-    // --- Delete a payment ---
+    // ================== DELETE PAYMENT ==================
     @DeleteMapping("/payments/{id}")
-    public void deletePayment(@PathVariable Long id) {
+    public ResponseEntity<String> deletePayment(@PathVariable Long id) {
+        if (!paymentRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
         paymentRepository.deleteById(id);
+        return ResponseEntity.ok("Payment deleted successfully");
     }
 }

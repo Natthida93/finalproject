@@ -21,6 +21,8 @@ public class Concert {
 
     private String venue;
 
+    private String image;
+
     @Column(name = "total_seats")
     private Integer totalSeats;
 
@@ -91,5 +93,13 @@ public class Concert {
 
     public void setSections(List<Section> sections) {
         this.sections = sections;
+    }
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 }

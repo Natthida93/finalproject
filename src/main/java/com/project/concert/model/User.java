@@ -71,7 +71,7 @@ public class User {
         this.email = email;
     }
 
-    // IMPORTANT: do NOT expose password in DTO later
+
     public String getPassword() {
         return password;
     }

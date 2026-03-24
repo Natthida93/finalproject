@@ -10,7 +10,8 @@ public class AlipayClientConfig {
 
     @Bean
     public AlipayClient alipayClient() {
-        return new DefaultAlipayClient(
+
+        DefaultAlipayClient client = new DefaultAlipayClient(
                 AlipayConfig.GATEWAY_URL,
                 AlipayConfig.APP_ID,
                 AlipayConfig.MERCHANT_PRIVATE_KEY,
@@ -19,5 +20,11 @@ public class AlipayClientConfig {
                 AlipayConfig.ALIPAY_PUBLIC_KEY,
                 AlipayConfig.SIGN_TYPE
         );
+
+        // ✅ FIX: set timeout BEFORE return
+        client.setConnectTimeout(15000);
+        client.setReadTimeout(15000);
+
+        return client;
     }
 }

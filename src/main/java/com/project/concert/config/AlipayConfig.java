@@ -9,6 +9,8 @@ public class AlipayConfig {
     public static final String GATEWAY_URL =
             "https://openapi-sandbox.dl.alipaydev.com/gateway.do";
 
+    /*https://openapi-sandbox.dl.alipaydev.com/gateway.do*/
+
     public static final String MERCHANT_PRIVATE_KEY =
             "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCYK3XQMV9Uk1r0AwrL9xCQ9YIVy3WwLG6TZsSayKKKi17SqyDfTHvlCi0CVdSFoOZLJy44cfhQ3x16mCIKMxkqZwMWRSb8hvtRG2yr82MJO5AMQoOHvGHWWm3MYYEdAcDr7GKFZqgpgReJuBI78hnQKwTHDQ98ywbBjLQHn5mHFNyZBFvci7zGmlHU8cvb45BZRvWQKKbrdHjUHTIOIhuJubydgC7gr1LXHhyvoNSmV/2tGjWWmaXG62CZKGhwPrM60Yh37MJWvRJxedQhPCwc3atrXcbOSCFMfWbo0cgbIOxK+Rx7oDtXF3AverAgATdz2Ys9jlWIdn+iA8NAT7XpAgMBAAECggEAK1HMA03a5rfgX7DyBOi75ZiOxOecBGBRxlKuS6YsZ6aPgwfGnusmJikEcTLAAp6wkNqBlP4VA+jQepMOtbqgQmr6/P8Iv0EqEIfvIvBx1DIJqwPQb/bYH2607Ucgu4JBSqiLz5BO9SnT6pflUP12DcYBYS09qHgf3z/QDI+J5GNBGWqu7OCUsO1q/fFkPTMKoKFwwtNw3niVbq5GjXHU9IdDzpPWPU2iVinVJUz/xKAfwyZg7hIHQQP6xj32YAnGy/RLHBvUicbl7fIQMupd2tA0AncOxLLCra188AF1fmalxsl59kQGZscQP4SgCuY1bkv6WP9243NKXUtPBxmlBQKBgQDojMaSjsmb9w251b01XHV6FaGxg3VW5R8nD3mQ5mW6h2nDpC/vzoXw+5U8gh6KEQWEuh1ETrP6o398JQhXrgOIF+NbIxvGlynMzTamdWbuVFC3gqXutcaLLU9KHneWlcJnyOEmapc86v9HWFwAbS84vHBa9jMCtA+Y8xRtB7wcOwKBgQCng7BlfJUdPHfVmdqdPZdH7SwkR+tQU+vpuplgXdyJUUop7xiNwt4SCwIkH9AhwOqfp0kDRvNwuc4A04+nL7LEM8dtTwNU/2a1gCXXD+Uz1Tp2Uluzp7IEi6i+7emoTxljBaMZfCiAsiK9BfrrselGkYVA81feCM0u0ohd981oKwKBgQCR4mZb4Hl3fye8MerNg+Aqo1FZQ+ejiH7fiSSxEug0eOiPk/uCi+OYxqrbV6GC6aS1m+/qPxlHHbRHFBBEuOR8RsgZD1BIZ+IQGZi0GihlUL2GMc6Yjq4r91OrYquQ6wgXBXzBFdMkoyNcBYFJvzUFealeVt6vTngOckeZEmYeqwKBgCGhMXeeZD1DV3d9dMMei1F4TuVVvusYfgMlYAdVsKGsvSvgAVjsZzLOHPbtoBY2qaO1rNXIl7ToyG+oCW3yCHyVPJM4Sp30zETh3jbnzQbz5tG8RQazQuzgsNbr4n3Uq28SwaSrJWJ44Lp8CdzpkcCGFG9uqxQ7Rh4BTDk5N3aTAoGBALVf8wwICfEW09vLaolJhD/1sA2Gna6HTt0FFDids9TAnZmQZ/K/HV3naUVpNYJB6KXKsjVouD+CxL8eLm0xK2ndK9w5PV967S2B5UL/IlMHqfsv7ypLsnC2rMY4BGHNHOBHd+YeZuSL4YmRsYitK4kOERTu1rw9r+ThGIHm6r2m";
 
@@ -19,6 +21,8 @@ public class AlipayConfig {
     public static final String FORMAT = "json";
     public static final String SIGN_TYPE = "RSA2";
 
-    public static final String NOTIFY_URL =
-            "http://localhost:8081/bookings/pay/notify";
+  /*  public static final String NOTIFY_URL =
+            "http://localhost:8081/bookings/pay/notify";*/
+  public static final String NOTIFY_URL =
+          "https://gangliest-stacey-minutial.ngrok-free.dev/payment/notify";
 }
