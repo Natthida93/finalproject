@@ -12,6 +12,8 @@ import com.alipay.api.response.AlipayTradePrecreateResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -50,15 +52,14 @@ public class PaymentService {
         );
     }
 
-    // ------------------------
-    // Initiate Payment (UNCHANGED except bug fix)
-    // ------------------------
+    // ---------------- INITIATE PAYMENT ----------------
     @Transactional
     public Payment initiatePayment(Long userId,
                                    List<Long> seatIds,
                                    Long concertId,
                                    String deliveryMethod,
-                                   boolean skipLock) {
+                                   String shippingAddress,
+                                   boolean lockSeats) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -72,140 +73,141 @@ public class PaymentService {
             throw new RuntimeException("Some seats not found");
         }
 
-        for (Seat seat : seats) {
+        BigDecimal seatTotal = seats.stream()
+                .map(Seat::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            if (!skipLock) {
+        BigDecimal shippingFee = "SHIPPED".equalsIgnoreCase(deliveryMethod)
+                ? BigDecimal.valueOf(50)
+                : BigDecimal.ZERO;
 
-                boolean expired = seat.getLockedUntil() == null
-                        || seat.getLockedUntil().isBefore(LocalDateTime.now());
-
-                if (seat.getStatus() == SeatStatus.LOCKED
-                        && !expired
-                        && !user.getId().equals(seat.getLockedById())) {
-
-                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not available");
-                }
-
-                if (seat.getStatus() == SeatStatus.AVAILABLE || expired) {
-
-                    seat.setStatus(SeatStatus.LOCKED);
-                    seat.setLockedById(user.getId());
-                    seat.setLockedUntil(LocalDateTime.now().plusMinutes(10));
-
-                    seatRepository.save(seat);
-                }
-            }
-        }
-
-        double totalPrice = seats.stream()
-                .mapToDouble(Seat::getPrice)
-                .sum();
+        BigDecimal totalPrice = seatTotal.add(shippingFee);
 
         String seatNumbers = seats.stream()
                 .map(Seat::getSeatNumber)
                 .sorted()
                 .collect(Collectors.joining(","));
 
-        Optional<Payment> existingPayment =
-                paymentRepository.findPendingPayment(
-                        user.getId(),
-                        concert.getId(),
-                        seatNumbers
-                );
-
-        if (existingPayment.isPresent()) {
-            return existingPayment.get();
-        }
-
         Payment payment = new Payment();
-
         payment.setUser(user);
         payment.setConcert(concert);
         payment.setSeats(new HashSet<>(seats));
-        payment.setDeliveryMethod(deliveryMethod);
         payment.setPrice(totalPrice);
-        payment.setStatus(PaymentStatus.PENDING);
         payment.setSeatNumber(seatNumbers);
+        payment.setDeliveryMethod(deliveryMethod);
+        payment.setShippingAddress(
+                "SHIPPED".equalsIgnoreCase(deliveryMethod) ? shippingAddress : null
+        );
+        payment.setUserName(user.getFullName());
+        payment.setUserEmail(user.getEmail());
+        payment.setConcertTitle(concert.getTitle());
+        payment.setStatus(PaymentStatus.PENDING);
 
+        // ⚡ NEW: Generate unique trade number (outTradeNo)
+        payment.setOutTradeNo(generateOutTradeNo());
+
+        if (lockSeats) {
+            LocalDateTime lockUntil = LocalDateTime.now().plusMinutes(5);
+            for (Seat seat : seats) {
+                seat.setLockedById(user.getId());
+                seat.setLockedUntil(lockUntil);
+                seatRepository.save(seat);
+            }
+        }
 
         return paymentRepository.save(payment);
     }
 
+    // ---------------- GENERATE UNIQUE TRADE NO ----------------
+    private String generateOutTradeNo() {
+        return "ORD" + System.currentTimeMillis() + (int)(Math.random() * 1000);
+    }
 
+    // ---------------- GET OR CREATE QR ----------------
+    @Transactional
+    public String getOrCreateQrCode(Payment payment) throws AlipayApiException {
 
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            throw new RuntimeException("Payment already completed");
+        }
+
+        if (payment.getQrCode() != null) {
+            return payment.getQrCode();
+        }
+
+        String qrCode = createQrCode(payment);
+        payment.setQrCode(qrCode);
+        paymentRepository.save(payment);
+
+        return qrCode;
+    }
+
+    // ---------------- CREATE QR ----------------
+    @Transactional(readOnly = true)
     public String createQrCode(Payment payment) throws AlipayApiException {
 
         AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
-
         request.setNotifyUrl(AlipayConfig.NOTIFY_URL);
 
-        String bizContent = "{"
-                + "\"out_trade_no\":\"" + payment.getId() + "\","
-                + "\"total_amount\":\"" + String.format("%.2f", payment.getPrice()) + "\","
-                + "\"subject\":\"Concert Booking #" + payment.getConcert().getTitle() + "\","
-                + "\"store_id\":\"STORE001\","
+        String totalAmount = payment.getPrice()
+                .setScale(2, RoundingMode.HALF_UP)
+                .toPlainString();
 
-                // 🔥 CRITICAL FIXES
+        String bizContent = "{"
+                + "\"out_trade_no\":\"" + payment.getOutTradeNo() + "\","
+                + "\"total_amount\":\"" + totalAmount + "\","
+                + "\"subject\":\"Concert Booking #" + payment.getConcertTitle() + "\","
+                + "\"store_id\":\"STORE001\","
                 + "\"product_code\":\"FACE_TO_FACE_PAYMENT\","
                 + "\"timeout_express\":\"5m\""
-
                 + "}";
 
-        System.out.println("Sending to Alipay: " + bizContent);
-
         request.setBizContent(bizContent);
+
+        System.out.println("=== ALIPAY REQUEST ===");
+        System.out.println("Trade No: " + payment.getOutTradeNo());
+        System.out.println("Total Amount: " + totalAmount);
 
         AlipayTradePrecreateResponse response = alipayClient.execute(request);
 
         if (response.isSuccess()) {
-            System.out.println("✅ QR Code created: " + response.getQrCode());
             return response.getQrCode();
         } else {
-            System.out.println("❌ Alipay error: " + response.getSubMsg());
             throw new RuntimeException("QR creation failed: " + response.getSubMsg());
         }
     }
 
-
-
-    // Handle Notify
-
+    // ---------------- HANDLE NOTIFY ----------------
     @Transactional
     public boolean handleAlipayNotify(Long paymentId, String tradeStatus) {
 
-        Payment payment = paymentRepository.findById(paymentId)
+        Payment payment = paymentRepository
+                .findByIdWithConcertAndSeats(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-        if (payment.getStatus() == PaymentStatus.COMPLETED) {
-            return true;
-        }
+        if (payment.getStatus() == PaymentStatus.COMPLETED) return true;
 
         if ("TRADE_SUCCESS".equalsIgnoreCase(tradeStatus)) {
 
             payment.setStatus(PaymentStatus.COMPLETED);
             payment.setCompletedAt(LocalDateTime.now());
 
-            Set<Seat> seats = payment.getSeats();
-
-            for (Seat seat : seats) {
-
+            for (Seat seat : payment.getSeats()) {
                 seat.setStatus(SeatStatus.BOOKED);
                 seat.setLockedById(null);
                 seat.setLockedUntil(null);
-
                 seatRepository.save(seat);
             }
 
             Booking booking = new Booking();
-
             booking.setUser(payment.getUser());
             booking.setConcert(payment.getConcert());
-            booking.setSeats(new HashSet<>(seats));
+            booking.setSeats(new HashSet<>(payment.getSeats()));
             booking.setPayment(payment);
             booking.setBookedAt(LocalDateTime.now());
+            booking.setDeliveryMethod(payment.getDeliveryMethod());
 
             bookingRepository.save(booking);
-
             paymentRepository.save(payment);
 
             return true;
@@ -213,28 +215,15 @@ public class PaymentService {
 
         payment.setStatus(PaymentStatus.FAILED);
         paymentRepository.save(payment);
-
         return false;
     }
 
-
-    // Get Pending
-
-    @Transactional(readOnly = true)
-    public List<Payment> getPendingPayments(Long userId, Long concertId) {
-        return paymentRepository.findPendingPaymentsWithSeats(userId, concertId);
-    }
-
-
-
-    // Get Status
-
+    // ---------------- GET STATUS ----------------
     @Transactional(readOnly = true)
     public String getPaymentStatus(Long paymentId) {
-
-        Payment payment = paymentRepository.findById(paymentId)
+        Payment payment = paymentRepository
+                .findByIdWithConcertAndSeats(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
-
         return payment.getStatus().name();
     }
 }

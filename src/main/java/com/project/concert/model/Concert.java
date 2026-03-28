@@ -1,8 +1,12 @@
 package com.project.concert.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -15,7 +19,7 @@ public class Concert {
 
     private LocalDate date;
 
-    private Double price;
+    private BigDecimal price;
 
     private String title;
 
@@ -23,17 +27,22 @@ public class Concert {
 
     private String image;
 
+    private LocalDateTime startTime;
+
     @Column(name = "total_seats")
     private Integer totalSeats;
-
-    public void setId(Long id) { this.id = id; }
 
     @Column(name = "available_seats")
     private Integer availableSeats;
 
-    @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private List<Section> sections;
+    @OneToMany(mappedBy = "concert",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Section> sections = new ArrayList<>();
+
+    // ================= GETTERS =================
 
     public Long getId() {
         return id;
@@ -43,63 +52,87 @@ public class Concert {
         return date;
     }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
-    }
-
-    public Double getPrice() {
+    public BigDecimal getPrice() {
         return price;
-    }
-
-    public void setPrice(Double price) {
-        this.price = price;
     }
 
     public String getTitle() {
         return title;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
     public String getVenue() {
         return venue;
-    }
-
-    public void setVenue(String venue) {
-        this.venue = venue;
-    }
-
-    public Integer getTotalSeats() {
-        return totalSeats;
-    }
-
-    public void setTotalSeats(Integer totalSeats) {
-        this.totalSeats = totalSeats;
-    }
-
-    public Integer getAvailableSeats() {
-        return availableSeats;
-    }
-
-    public void setAvailableSeats(Integer availableSeats) {
-        this.availableSeats = availableSeats;
-    }
-
-    public List<Section> getSections() {
-        return sections;
-    }
-
-    public void setSections(List<Section> sections) {
-        this.sections = sections;
     }
 
     public String getImage() {
         return image;
     }
 
+    public Integer getTotalSeats() {
+        return totalSeats;
+    }
+
+    public Integer getAvailableSeats() {
+        return availableSeats;
+    }
+
+    public List<Section> getSections() {
+        return sections;
+    }
+
+    // ================= SETTERS =================
+
+    public void setDate(LocalDate date) {
+        this.date = date;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setVenue(String venue) {
+        this.venue = venue;
+    }
+
     public void setImage(String image) {
         this.image = image;
     }
+
+    public void setTotalSeats(Integer totalSeats) {
+        this.totalSeats = totalSeats;
+    }
+
+    public void setAvailableSeats(Integer availableSeats) {
+        this.availableSeats = availableSeats;
+    }
+
+
+    public void setSections(List<Section> sections) {
+        this.sections.clear();
+
+        if (sections != null) {
+            for (Section section : sections) {
+                addSection(section);
+            }
+        }
+    }
+
+    // ================= RELATION HELPERS =================
+
+    public void addSection(Section section) {
+        this.sections.add(section);
+        section.setConcert(this);
+    }
+
+    public void removeSection(Section section) {
+        this.sections.remove(section);
+        section.setConcert(null);
+    }
+
+    public LocalDateTime getStartTime() { return startTime; }
+    public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
 }

@@ -2,14 +2,18 @@ package com.project.concert.controller;
 
 import com.project.concert.model.*;
 import com.project.concert.repository.*;
+import com.project.concert.service.PaymentService;
 import com.project.concert.service.SeatService;
-import jakarta.transaction.Transactional;
-import org.springframework.http.HttpStatus;
+
+import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/bookings")
@@ -20,221 +24,151 @@ public class BookingController {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
-
-    private final  ConcertRepository concertRepository;
-
+    private final ConcertRepository concertRepository;
+    private final PaymentService paymentService;
 
     public BookingController(SeatService seatService,
                              BookingRepository bookingRepository,
                              UserRepository userRepository,
                              PaymentRepository paymentRepository,
-                             ConcertRepository concertRepository) {
+                             ConcertRepository concertRepository,
+                             PaymentService paymentService) {
         this.seatService = seatService;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.concertRepository = concertRepository;
-    }
-
-    // ================= LOCK SEATS =================
-    @PostMapping("/lock")
-    public ResponseEntity<?> lockSeats(@RequestBody BookingRequest request) {
-        try {
-            User user = userRepository.findByEmail(request.getUserEmail())
-                    .orElseThrow(() -> new RuntimeException("Invalid user"));
-
-            List<Seat> lockedSeats = new ArrayList<>();
-            for (Long seatId : request.getSeatIds()) {
-                Seat seat = seatService.getSeatById(seatId);
-
-                if (seat.getStatus() != SeatStatus.AVAILABLE) {
-                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not available");
-                }
-
-                seat.setStatus(SeatStatus.LOCKED);
-                seat.setLockedById(user.getId());
-                seat.setLockedUntil(LocalDateTime.now().plusMinutes(5));
-
-                seatService.saveSeat(seat);
-                lockedSeats.add(seat);
-            }
-
-            return ResponseEntity.ok("Seats locked successfully for 5 minutes.");
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-        }
-    }
-
-    // ================= CONFIRM BOOKING AFTER PAYMENT =================
-    @Transactional
-    @PostMapping("/confirm")
-    public ResponseEntity<?> confirmBooking(@RequestBody PaymentConfirmationRequest request) {
-        try {
-            Payment payment = paymentRepository.findById(request.getPaymentId())
-                    .orElseThrow(() -> new RuntimeException("Payment not found"));
-
-            if (payment.getStatus() != PaymentStatus.COMPLETED) {
-                throw new RuntimeException("Payment not completed yet");
-            }
-
-            Set<Seat> seats = payment.getSeats();
-            for (Seat seat : seats) {
-                if (seat.getLockedById() == null ||
-                        !seat.getLockedById().equals(payment.getUser().getId())) {
-                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not locked for this user");
-                }
-
-                if (seat.getStatus() != SeatStatus.LOCKED) {
-                    throw new RuntimeException("Seat " + seat.getSeatNumber() + " is not locked");
-                }
-
-                seat.setStatus(SeatStatus.BOOKED);
-                seat.setLockedById(null);
-                seat.setLockedUntil(null);
-                seatService.saveSeat(seat);
-            }
-
-            // === FIX: Explicitly set bookedAt to avoid DB default error ===
-            Booking booking = new Booking();
-            booking.setUser(payment.getUser());
-            booking.setConcert(payment.getConcert());
-            booking.setSeats(seats);
-            booking.setPayment(payment);
-            booking.setBookedAt(LocalDateTime.now()); // <-- explicitly set booking time
-
-            bookingRepository.save(booking);
-
-            return ResponseEntity.ok(booking);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-        }
+        this.paymentService = paymentService;
     }
 
     // ================= GET BOOKING BY PAYMENT =================
+    @Transactional(readOnly = true)
     @GetMapping("/by-payment/{paymentId}")
     public ResponseEntity<?> getBookingByPayment(@PathVariable Long paymentId) {
 
-        Optional<Booking> optionalBooking =
-                bookingRepository.findByPayment_Id(paymentId);
+        Optional<Booking> bookingOpt =
+                bookingRepository.findByPaymentIdWithSeatsAndConcert(paymentId);
 
-        if (optionalBooking.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Booking not found");
+        if (bookingOpt.isPresent()) {
+            return ResponseEntity.ok(new BookingDTO(bookingOpt.get()));
         }
 
-        return ResponseEntity.ok(optionalBooking.get());
-    }
+        Optional<Payment> paymentOpt =
+                paymentRepository.findByIdWithConcertAndSeats(paymentId);
 
-    // ================= USER BOOKING HISTORY =================
-    @GetMapping("/history/{userEmail}")
-    public ResponseEntity<?> getUserBookingHistory(@PathVariable String userEmail) {
-        User user = userRepository.findByEmail(userEmail).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        if (paymentOpt.isPresent()) {
+            return ResponseEntity.ok(new BookingDTO(paymentOpt.get()));
         }
 
-        List<Booking> bookings = bookingRepository.findByUser(user);
-        List<Map<String, Object>> history = new ArrayList<>();
+        return ResponseEntity.notFound().build();
+    }
 
-        for (Booking b : bookings) {
-            Map<String, Object> item = new HashMap<>();
-            // Include concert ID for frontend
-            item.put("concertId", b.getConcert().getId());
-            item.put("concertName", b.getConcert().getTitle());
-            item.put("concertDate", b.getConcert().getDate());
+    // ==================== DTOs ====================
 
-            // Include payment ID for polling
-            item.put("paymentId", b.getPayment().getId());
-            item.put("paymentStatus", b.getPayment().getStatus().name());
+    public static class BookingDTO {
+        private Long bookingId;
+        private LocalDateTime bookedAt;
+        private ConcertDTO concert;
+        private Set<SeatDTO> seats;
+        private PaymentDTO payment;
+        private String deliveryMethod; // ✅ NEW FIELD
 
-            item.put("totalPrice", b.getSeats().stream().mapToDouble(Seat::getPrice).sum());
+        public BookingDTO(Booking b) {
+            this.bookingId = b.getId();
+            this.bookedAt = b.getBookedAt();
+            this.concert = new ConcertDTO(b.getConcert());
+            this.seats = b.getSeats()
+                    .stream()
+                    .map(SeatDTO::new)
+                    .collect(Collectors.toSet());
 
-            List<Map<String, Object>> seatsInfo = new ArrayList<>();
-            for (Seat s : b.getSeats()) {
-                Map<String, Object> seatMap = new HashMap<>();
-                seatMap.put("seatNumber", s.getSeatNumber());
-                seatMap.put("section", s.getSection().getName());
-                seatMap.put("price", s.getPrice());
-                seatsInfo.add(seatMap);
-            }
-            item.put("seats", seatsInfo);
-            item.put("bookedAt", b.getBookedAt());
+            this.payment = b.getPayment() != null
+                    ? new PaymentDTO(b.getPayment())
+                    : null;
 
-            history.add(item);
+            // IMPORTANT: get from Booking
+            this.deliveryMethod = b.getDeliveryMethod();
         }
 
-        return ResponseEntity.ok(history);
-    }
+        public BookingDTO(Payment p) {
+            this.bookingId = null;
+            this.bookedAt = p.getCompletedAt();
+            this.concert = new ConcertDTO(p.getConcert());
+            this.seats = p.getSeats()
+                    .stream()
+                    .map(SeatDTO::new)
+                    .collect(Collectors.toSet());
 
-    @PostMapping("/alipay")
-    public ResponseEntity<?> payWithAlipay(@RequestBody Map<String, Object> payload) {
-        try {
-            Long userId = Long.valueOf(payload.get("userId").toString());
-            Long concertId = Long.valueOf(payload.get("concertId").toString());
-            Double totalPrice = Double.valueOf(payload.get("price").toString()); // Use your price field
+            this.payment = new PaymentDTO(p);
 
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            Concert concert = concertRepository.findById(concertId)
-                    .orElseThrow(() -> new RuntimeException("Concert not found"));
-
-            Payment payment = new Payment();
-            payment.setUser(user);
-            payment.setConcert(concert);
-            payment.setPrice(totalPrice);
-            payment.setStatus(PaymentStatus.PENDING);
-            paymentRepository.save(payment);
-
-            // Generate sandbox QR code
-            String qrCodeUrl = "https://via.placeholder.com/200?text=Alipay+Sandbox+QR";
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("qrCodeUrl", qrCodeUrl);
-            response.put("paymentId", payment.getId());
-
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-        }
-    }
-    // 2️⃣ Handle Alipay notify callback
-    @PostMapping("/alipay/notify")
-    public ResponseEntity<String> handleAlipayNotify(@RequestParam Long paymentId,
-                                                     @RequestParam String tradeStatus) {
-        Optional<Payment> optionalPayment = paymentRepository.findById(paymentId);
-        if (optionalPayment.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Payment not found");
-
-        Payment payment = optionalPayment.get();
-
-        if ("TRADE_SUCCESS".equals(tradeStatus)) {
-            payment.setStatus(PaymentStatus.COMPLETED);
-            paymentRepository.save(payment);
-
-            // Optional: automatically confirm booking if you want
-            // You can reuse your confirmBooking() logic here if desired
-
-            return ResponseEntity.ok("SUCCESS");
+            // FIX: Payment does NOT have deliveryMethod
+            this.deliveryMethod = null;
         }
 
-        return ResponseEntity.ok("FAILED");
+        public Long getBookingId() { return bookingId; }
+        public LocalDateTime getBookedAt() { return bookedAt; }
+        public ConcertDTO getConcert() { return concert; }
+        public Set<SeatDTO> getSeats() { return seats; }
+        public PaymentDTO getPayment() { return payment; }
+        public String getDeliveryMethod() { return deliveryMethod; } // ✅
     }
 
-    // ================= DTOs =================
-    public static class BookingRequest {
-        private String userEmail;
-        private Set<Long> seatIds;
+    // ==================== Seat DTO ====================
+    public static class SeatDTO {
+        private Long seatId;
+        private String label;
+        private String status;
+        private BigDecimal price;
 
-        public String getUserEmail() { return userEmail; }
-        public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
-        public Set<Long> getSeatIds() { return seatIds; }
-        public void setSeatIds(Set<Long> seatIds) { this.seatIds = seatIds; }
+        public SeatDTO(Seat s) {
+            this.seatId = s.getId();
+            this.label = s.getSeatNumber();
+            this.status = s.getStatus().name();
+            this.price = s.getPrice();
+        }
+
+        public Long getSeatId() { return seatId; }
+        public String getLabel() { return label; }
+        public String getStatus() { return status; }
+        public BigDecimal getPrice() { return price; }
     }
 
-    public static class PaymentConfirmationRequest {
+    // ==================== Concert DTO ====================
+    public static class ConcertDTO {
+        private Long concertId;
+        private String title;
+        private String startTime;
+
+        public ConcertDTO(Concert c) {
+            this.concertId = c.getId();
+            this.title = c.getTitle();
+            this.startTime = c.getStartTime() != null
+                    ? c.getStartTime().toString()
+                    : "TBD";
+        }
+
+        public Long getConcertId() { return concertId; }
+        public String getTitle() { return title; }
+        public String getStartTime() { return startTime; }
+    }
+
+    // ==================== Payment DTO ====================
+    public static class PaymentDTO {
         private Long paymentId;
+        private String status;
+        private BigDecimal price;
+        private String outTradeNo;
+
+        public PaymentDTO(Payment p) {
+            this.paymentId = p.getId();
+            this.status = p.getStatus().name();
+            this.price = p.getPrice();
+            this.outTradeNo = p.getOutTradeNo();
+        }
 
         public Long getPaymentId() { return paymentId; }
-        public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
+        public String getStatus() { return status; }
+        public BigDecimal getPrice() { return price; }
+        public String getOutTradeNo() { return outTradeNo; }
     }
 }

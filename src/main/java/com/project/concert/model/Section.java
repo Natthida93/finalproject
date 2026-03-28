@@ -1,8 +1,10 @@
 package com.project.concert.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -18,9 +20,6 @@ public class Section {
     // VIP = 2.0 , A = 1.5 , B = 1.2 , C = 1.0
     private double priceMultiplier;
 
-    public void setId(Long id) {
-        this.id = id;}
-
     // ===== Relationship to Concert =====
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concert_id", nullable = false)
@@ -28,9 +27,12 @@ public class Section {
     private Concert concert;
 
     // ===== Relationship to Seats =====
-    @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private List<Seat> seats;
+    @OneToMany(mappedBy = "section",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Seat> seats = new ArrayList<>();
 
     public Section() {}
 
@@ -40,6 +42,8 @@ public class Section {
         this.concert = concert;
     }
 
+    // ================= GETTERS =================
+
     public Long getId() {
         return id;
     }
@@ -48,31 +52,56 @@ public class Section {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public double getPriceMultiplier() {
         return priceMultiplier;
-    }
-
-    public void setPriceMultiplier(double priceMultiplier) {
-        this.priceMultiplier = priceMultiplier;
     }
 
     public Concert getConcert() {
         return concert;
     }
 
-    public void setConcert(Concert concert) {
-        this.concert = concert;
-    }
-
     public List<Seat> getSeats() {
         return seats;
     }
 
+    // ================= SETTERS =================
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setPriceMultiplier(double priceMultiplier) {
+        this.priceMultiplier = priceMultiplier;
+    }
+
+    public void setConcert(Concert concert) {
+        this.concert = concert;
+    }
+
+    // ✅ FIXED (same pattern as Concert)
     public void setSeats(List<Seat> seats) {
-        this.seats = seats;
+        this.seats.clear();
+
+        if (seats != null) {
+            for (Seat seat : seats) {
+                addSeat(seat);
+            }
+        }
+    }
+
+    // ================= RELATION HELPERS =================
+
+    public void addSeat(Seat seat) {
+        this.seats.add(seat);
+        seat.setSection(this); // 🔥 VERY IMPORTANT
+    }
+
+    public void removeSeat(Seat seat) {
+        this.seats.remove(seat);
+        seat.setSection(null);
     }
 }

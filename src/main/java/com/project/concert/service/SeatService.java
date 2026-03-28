@@ -8,10 +8,10 @@ import com.project.concert.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Service
 public class SeatService {
@@ -53,21 +53,19 @@ public class SeatService {
         seat.setLockedById(userId);
         seat.setLockedUntil(now.plusMinutes(5));
 
-        seatRepository.save(seat);
-        return seat;
+        return seatRepository.save(seat);
     }
+
     // ================= UNLOCK SEAT =================
     @Transactional
     public void unlockSeat(Long seatId, Long userId) {
         Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new RuntimeException("Seat not found with ID: " + seatId));
 
-        // Only the user who locked it can unlock
         if (!userId.equals(seat.getLockedById())) {
             throw new RuntimeException("You do not own this lock");
         }
 
-        // Only unlock if currently locked
         if (seat.getStatus() == SeatStatus.LOCKED) {
             seat.setStatus(SeatStatus.AVAILABLE);
             seat.setLockedById(null);
@@ -75,6 +73,7 @@ public class SeatService {
             seatRepository.save(seat);
         }
     }
+
     // ================= CONFIRM BOOKING =================
     @Transactional
     public Seat confirmBooking(Long seatId, Long userId) {
@@ -93,12 +92,14 @@ public class SeatService {
         seat.setStatus(SeatStatus.BOOKED);
         seat.setLockedById(null);
         seat.setLockedUntil(null);
-
         seatRepository.save(seat);
 
         // update available seats in concert
         Concert concert = seat.getConcert();
-        concert.setAvailableSeats(concert.getAvailableSeats() - 1);
+        if (concert.getAvailableSeats() != null) {
+            concert.setAvailableSeats(concert.getAvailableSeats() - 1);
+            concertRepository.save(concert);
+        }
 
         return seat;
     }
@@ -148,6 +149,9 @@ public class SeatService {
     }
 
     private void createSeatsForSection(Concert concert, Section section, int rows, int seatsPerRow) {
+        BigDecimal concertPrice = concert.getPrice();
+        if (concertPrice == null) concertPrice = BigDecimal.ZERO;
+
         for (int r = 0; r < rows; r++) {
             char rowLetter = (char) ('A' + r);
             for (int s = 1; s <= seatsPerRow; s++) {
@@ -156,7 +160,11 @@ public class SeatService {
                 seat.setSection(section);
                 seat.setSeatNumber(rowLetter + String.valueOf(s));
                 seat.setStatus(SeatStatus.AVAILABLE);
-                seat.setPrice(concert.getPrice() * section.getPriceMultiplier());
+
+                BigDecimal price = concertPrice.multiply(BigDecimal.valueOf(section.getPriceMultiplier()))
+                        .setScale(2, BigDecimal.ROUND_HALF_UP);
+                seat.setPrice(price);
+
                 seatRepository.save(seat);
             }
         }

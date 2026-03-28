@@ -34,4 +34,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "payment"
     })
     Optional<Booking> findByPayment_Id(Long paymentId);
+
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.seats LEFT JOIN FETCH b.concert WHERE b.payment.id = :paymentId")
+    Optional<Booking> findByPaymentIdWithSeatsAndConcert(@Param("paymentId") Long paymentId);
+
+
 }

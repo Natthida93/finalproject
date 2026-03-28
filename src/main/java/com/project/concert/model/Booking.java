@@ -36,6 +36,10 @@ public class Booking {
     @Column(name = "booked_at", nullable = false)
     private LocalDateTime bookedAt;
 
+    // ✅ NEW FIELD
+    @Column(name = "delivery_method")
+    private String deliveryMethod;
+
     @PrePersist
     protected void onCreate() {
         if (bookedAt == null) {
@@ -43,7 +47,7 @@ public class Booking {
         }
     }
 
-    // ================= GETTERS / SETTERS =================
+    // ================= GETTERS =================
 
     public Long getId() { return id; }
     public User getUser() { return user; }
@@ -51,6 +55,9 @@ public class Booking {
     public Set<Seat> getSeats() { return seats; }
     public Payment getPayment() { return payment; }
     public LocalDateTime getBookedAt() { return bookedAt; }
+    public String getDeliveryMethod() { return deliveryMethod; } // ✅
+
+    // ================= SETTERS =================
 
     public void setId(Long id) { this.id = id; }
     public void setUser(User user) { this.user = user; }
@@ -58,4 +65,5 @@ public class Booking {
     public void setSeats(Set<Seat> seats) { this.seats = seats; }
     public void setPayment(Payment payment) { this.payment = payment; }
     public void setBookedAt(LocalDateTime bookedAt) { this.bookedAt = bookedAt; }
+    public void setDeliveryMethod(String deliveryMethod) { this.deliveryMethod = deliveryMethod; }
 }

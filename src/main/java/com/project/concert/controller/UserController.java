@@ -146,4 +146,27 @@ public class UserController {
                     .body("Error deleting user: " + e.getMessage());
         }
     }
+
+
+    //-----------------UpdateAddress----------------------
+    @PutMapping("/update-address")
+    public ResponseEntity<?> updateAddress(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        String newAddress = payload.get("address");
+
+        if(email == null || newAddress == null) {
+            return ResponseEntity.badRequest().body("Email or address missing");
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if(userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+
+        User user = userOpt.get();
+        user.setAddress(newAddress);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Address updated successfully");
+    }
 }

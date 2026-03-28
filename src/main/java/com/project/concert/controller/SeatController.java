@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ public class SeatController {
                     seat.getId(),
                     seat.getSeatNumber(),
                     seat.getStatus().name(),
-                    seat.getPrice() != null ? seat.getPrice() : 0.0
+                    seat.getPrice() != null ? seat.getPrice() : BigDecimal.ZERO
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
@@ -62,6 +63,7 @@ public class SeatController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         }
     }
+
     // ================= CONFIRM SEAT =================
     @PostMapping("/confirm")
     public ResponseEntity<?> confirmSeat(@RequestParam Long seatId, @RequestParam Long userId) {
@@ -76,7 +78,7 @@ public class SeatController {
             payment.setConcert(seat.getConcert());
             payment.setUser(user);
             payment.setSeats(Set.of(seat));
-            payment.setPrice(seat.getPrice() != null ? seat.getPrice() : 0.0);
+            payment.setPrice(seat.getPrice() != null ? seat.getPrice() : BigDecimal.ZERO);
             payment.setDeliveryMethod("CONCERT");
             payment.setShippingAddress(null);
             payment.setUserIdNumber(null);
@@ -87,7 +89,7 @@ public class SeatController {
                     seat.getId(),
                     seat.getSeatNumber(),
                     seat.getStatus().name(),
-                    seat.getPrice() != null ? seat.getPrice() : 0.0
+                    seat.getPrice() != null ? seat.getPrice() : BigDecimal.ZERO
             ));
 
         } catch (RuntimeException e) {
@@ -95,20 +97,21 @@ public class SeatController {
         }
     }
 
+    // ================= VALIDATE LOCKS =================
     @PostMapping("/validate-locks")
     public ResponseEntity<?> validateLocks(@RequestBody Map<String, Object> payload) {
         try {
             List<Integer> seatIds = (List<Integer>) payload.get("seatIds");
             String userEmail = (String) payload.get("userEmail");
 
-            // Call your SeatService to check if seats are still locked by this user
             List<Seat> availableSeats = seatService.validateSeatLocks(seatIds, userEmail);
 
-            return ResponseEntity.ok(availableSeats); // empty list if any seat is invalid
+            return ResponseEntity.ok(availableSeats);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
+
     // ================= GET SEATS BY ZONE =================
     @GetMapping("/concert/{concertId}/zone")
     public ResponseEntity<List<SeatDto>> getSeatMapByZone(@PathVariable Long concertId,
@@ -121,7 +124,7 @@ public class SeatController {
                             s.getId(),
                             s.getSeatNumber(),
                             s.getStatus() != null ? s.getStatus().name() : SeatStatus.AVAILABLE.name(),
-                            s.getPrice() != null ? s.getPrice() : 0.0
+                            s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO
                     ))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(seatGrid);

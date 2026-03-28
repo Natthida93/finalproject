@@ -30,6 +30,7 @@ public class ConcertService {
         this.sectionRepository = sectionRepository;
     }
 
+    // ================= CREATE CONCERT =================
     @Transactional
     public Concert createConcert(Concert concert) {
 
@@ -65,35 +66,33 @@ public class ConcertService {
         return savedConcert;
     }
 
+    // ================= GET CONCERT WITH SECTIONS =================
     @Transactional
     public Concert getConcertWithSections(Long concertId) {
-        Concert concert = concertRepository.findById(concertId)
+
+        Concert concert = concertRepository.findByIdWithSections(concertId)
                 .orElseThrow(() -> new RuntimeException("Concert not found"));
 
-        // Fetch sections for this concert
-        List<Section> sections = sectionRepository.findByConcert_Id(concertId);
 
-        // For each section, fetch seats
-        for (Section section : sections) {
-            List<Seat> seats = seatRepository.findBySection_Id(section.getId());
-            section.setSeats(seats);
+        for (Section section : concert.getSections()) {
+            section.getSeats().size(); // triggers lazy load
         }
-
-        concert.setSections(sections);
 
         return concert;
     }
-
+    // ================= AVAILABLE SEATS BY ZONE =================
     @Transactional
     public Map<String, Integer> getAvailableSeatsByZone(Long concertId) {
-        // Fetch sections for the concert
+
         List<Section> sections = sectionRepository.findByConcert_Id(concertId);
 
         Map<String, Integer> availableSeats = new HashMap<>();
 
         for (Section section : sections) {
-            // Count seats that are AVAILABLE
-            int count = seatRepository.countBySection_IdAndStatus(section.getId(), SeatStatus.AVAILABLE);
+            int count = seatRepository.countBySection_IdAndStatus(
+                    section.getId(),
+                    SeatStatus.AVAILABLE
+            );
             availableSeats.put(section.getName(), count);
         }
 

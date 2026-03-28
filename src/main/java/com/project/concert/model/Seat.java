@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -25,8 +26,9 @@ public class Seat {
 
     private String label;
 
-    @Column(nullable = false)
-    private Double price;
+    // ✅ FIXED: use BigDecimal instead of Double
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
 
     @Enumerated(EnumType.STRING)
     private SeatStatus status;
@@ -55,10 +57,6 @@ public class Seat {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getSeatNumber() {
         return seatNumber;
     }
@@ -83,11 +81,13 @@ public class Seat {
         this.label = label;
     }
 
-    public Double getPrice() {
+    // ✅ FIXED
+    public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(Double price) {
+    // ✅ FIXED
+    public void setPrice(BigDecimal price) {
         this.price = price;
     }
 
