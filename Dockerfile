@@ -1,13 +1,21 @@
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jdk AS build
 
 WORKDIR /app
 
 COPY . .
 
 RUN chmod +x mvnw
+RUN ./mvnw clean package -DskipTests
 
-RUN ./mvnw clean install -DskipTests
+
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-CMD ["java", "-jar", "target/concert-0.0.1-SNAPSHOT.jar"]
+ENV PORT=8080
+
+CMD ["sh", "-c", "java -jar app.jar --server.port=$PORT"]
