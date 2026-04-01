@@ -16,19 +16,19 @@ public class CorsConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        // ✅ Allow frontend (Netlify)
+
         config.setAllowedOrigins(Arrays.asList(
                 "https://concertticketingsystem.netlify.app"
         ));
 
-        // ✅ Allow everything needed
+
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
-        // ✅ VERY IMPORTANT (for auth / cookies / headers)
+
         config.setAllowCredentials(true);
 
-        // ✅ ADD THIS (fixes missing headers issue)
+
         config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

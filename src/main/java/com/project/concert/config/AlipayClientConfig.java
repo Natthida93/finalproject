@@ -21,7 +21,6 @@ public class AlipayClientConfig {
                 AlipayConfig.SIGN_TYPE
         );
 
-        // ✅ FIX: set timeout BEFORE return
         client.setConnectTimeout(15000);
         client.setReadTimeout(15000);
 
