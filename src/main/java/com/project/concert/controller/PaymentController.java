@@ -13,13 +13,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
 @RestController
 @RequestMapping("/payment")
-@CrossOrigin(
-        origins = "https://concertticketingsystem.netlify.app",
-        allowedHeaders = "*",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
-)
+@CrossOrigin(origins = "*")
 public class PaymentController {
 
     private final PaymentService paymentService;
