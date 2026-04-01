@@ -11,9 +11,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.Optional;
 
-@CrossOrigin(origins = "http://localhost:5174") // allow Vue frontend
 @RestController
 @RequestMapping("/users")
+@CrossOrigin(
+        origins = "https://concertticketingsystem.netlify.app",
+        allowedHeaders = "*",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+)
 public class UserController {
 
     @Autowired

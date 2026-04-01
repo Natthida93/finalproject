@@ -19,9 +19,12 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/seats")
-@CrossOrigin(origins = "http://localhost:5174")
-public class SeatController {
-
+    @CrossOrigin(
+            origins = "https://concertticketingsystem.netlify.app",
+            allowedHeaders = "*",
+            methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+    )
+    public class SeatController {
     private final SeatService seatService;
     private final ConcertRepository concertRepository;
     private final SeatRepository seatRepository;

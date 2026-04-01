@@ -17,7 +17,11 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/bookings")
-@CrossOrigin(origins = "*")
+@CrossOrigin(
+        origins = "https://concertticketingsystem.netlify.app",
+        allowedHeaders = "*",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+)
 public class BookingController {
 
     private final SeatService seatService;
@@ -71,7 +75,7 @@ public class BookingController {
         private ConcertDTO concert;
         private Set<SeatDTO> seats;
         private PaymentDTO payment;
-        private String deliveryMethod; // ✅ NEW FIELD
+        private String deliveryMethod;
 
         public BookingDTO(Booking b) {
             this.bookingId = b.getId();
@@ -110,7 +114,7 @@ public class BookingController {
         public ConcertDTO getConcert() { return concert; }
         public Set<SeatDTO> getSeats() { return seats; }
         public PaymentDTO getPayment() { return payment; }
-        public String getDeliveryMethod() { return deliveryMethod; } // ✅
+        public String getDeliveryMethod() { return deliveryMethod; }
     }
 
     // ==================== Seat DTO ====================

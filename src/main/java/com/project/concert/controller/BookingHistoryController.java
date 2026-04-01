@@ -13,10 +13,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
 @RestController
 @RequestMapping("/bookings")
-@CrossOrigin(origins = "http://localhost:5174")
 @Transactional(readOnly = true)
+@CrossOrigin(
+        origins = "https://concertticketingsystem.netlify.app",
+        allowedHeaders = "*",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+)
 public class BookingHistoryController {
 
     private final PaymentRepository paymentRepository;

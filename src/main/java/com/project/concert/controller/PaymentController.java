@@ -16,7 +16,11 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/payment")
-@CrossOrigin(origins = "http://localhost:5174")
+@CrossOrigin(
+        origins = "https://concertticketingsystem.netlify.app",
+        allowedHeaders = "*",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+)
 public class PaymentController {
 
     private final PaymentService paymentService;
