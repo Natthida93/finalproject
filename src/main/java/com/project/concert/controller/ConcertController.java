@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/concerts")
-@CrossOrigin(origins = "http://localhost:5174")
+@CrossOrigin(origins = "https://concertticketingsystem.netlify.app")
 public class ConcertController {
 
     private final ConcertService concertService;

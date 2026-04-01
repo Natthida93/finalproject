@@ -11,13 +11,18 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-//@CrossOrigin(origins = "http://localhost:5174")
 public class AuthController {
 
     private final AuthService authService;
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+    }
+
+
+    @RequestMapping(value = "/**", method = RequestMethod.OPTIONS)
+    public ResponseEntity<?> handleOptions() {
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/register")
@@ -47,8 +52,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
         try {
-            // AuthService.login now returns boolean for success
-            boolean success = authService.login(request); // make sure this method checks raw vs encoded
+            boolean success = authService.login(request);
 
             if (success) {
                 return ResponseEntity.ok(Map.of(
