@@ -19,7 +19,14 @@ import java.util.stream.Collectors;
 @CrossOrigin(
         origins = "https://concertticketingsystem.netlify.app",
         allowedHeaders = "*",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS}
+        methods = {
+                RequestMethod.GET,
+                RequestMethod.POST,
+                RequestMethod.PUT,
+                RequestMethod.DELETE,
+                RequestMethod.OPTIONS
+        },
+        allowCredentials = "true"
 )
 public class PaymentController {
 
@@ -32,21 +39,33 @@ public class PaymentController {
         this.paymentRepository = paymentRepository;
     }
 
+
+    @RequestMapping(value = "/**", method = RequestMethod.OPTIONS)
+    public ResponseEntity<?> handleOptions() {
+        return ResponseEntity.ok().build();
+    }
+
     // ---------------- CREATE PAYMENT + QR ----------------
     @PostMapping("/create")
     public ResponseEntity<?> createPayment(@RequestBody Map<String, Object> payload) throws AlipayApiException {
+
+        System.out.println("🔥 CREATE PAYMENT PAYLOAD: " + payload);
+
         Long userId = Long.valueOf(payload.get("userId").toString());
+
         List<Long> seatIds = ((List<?>) payload.get("seatIds"))
                 .stream()
                 .map(id -> Long.valueOf(id.toString()))
                 .collect(Collectors.toList());
 
-        // Check if there is already a pending or completed payment for the same user + seats
         Optional<Payment> existingPayment = paymentRepository
                 .findPendingOrCompletedByUserAndSeats(userId, seatIds);
 
         if (existingPayment.isPresent()) {
             Payment payment = existingPayment.get();
+
+            System.out.println("⚡ EXISTING PAYMENT FOUND: " + payment.getId());
+
             return ResponseEntity.ok(Map.of(
                     "paymentId", payment.getId(),
                     "qrCode", payment.getQrCode(),
@@ -54,7 +73,6 @@ public class PaymentController {
             ));
         }
 
-        // Otherwise, create new payment as usual
         Payment payment = paymentService.initiatePayment(
                 userId,
                 seatIds,
@@ -66,12 +84,15 @@ public class PaymentController {
 
         String qrCode = paymentService.getOrCreateQrCode(payment);
 
+        System.out.println("NEW PAYMENT CREATED: " + payment.getId());
+
         return ResponseEntity.ok(Map.of(
                 "qrCode", qrCode,
                 "paymentId", payment.getId(),
                 "status", payment.getStatus().name()
         ));
     }
+
     // ---------------- REFRESH EXISTING PAYMENT QR ----------------
     @PostMapping("/refresh/{paymentId}")
     public ResponseEntity<?> refreshQr(@PathVariable Long paymentId) {
@@ -80,6 +101,8 @@ public class PaymentController {
                     .orElseThrow(() -> new RuntimeException("Payment not found"));
 
             String qrCode = paymentService.getOrCreateQrCode(payment);
+
+            System.out.println("🔄 QR REFRESHED: " + paymentId);
 
             return ResponseEntity.ok(Map.of(
                     "qrCode", qrCode,
@@ -95,6 +118,9 @@ public class PaymentController {
     // ---------------- ALIPAY NOTIFY ----------------
     @PostMapping("/notify")
     public String handleNotify(HttpServletRequest request) {
+
+        System.out.println("🔥 NOTIFY ENDPOINT HIT");
+
         Map<String, String> params = new HashMap<>();
         request.getParameterMap().forEach((key, values) -> {
             if (values != null && values.length > 0) {
@@ -102,19 +128,23 @@ public class PaymentController {
             }
         });
 
-        System.out.println("[Alipay Notify] params: " + params);
+        System.out.println("📦 Alipay params: " + params);
 
         try {
             String tradeStatus = params.get("trade_status");
-            String outTradeNo = params.get("out_trade_no"); // ⚡ important
+            String outTradeNo = params.get("out_trade_no");
 
-            if (tradeStatus == null || outTradeNo == null) return "fail";
+            if (tradeStatus == null || outTradeNo == null) {
+                System.out.println("❌ Missing tradeStatus or outTradeNo");
+                return "fail";
+            }
 
-            // Find payment by outTradeNo instead of DB id
             Payment payment = paymentRepository.findByOutTradeNo(outTradeNo)
                     .orElseThrow(() -> new RuntimeException("Payment not found"));
 
             boolean success = paymentService.handleAlipayNotify(payment.getId(), tradeStatus);
+
+            System.out.println("💰 PAYMENT UPDATE RESULT: " + success);
 
             return success ? "success" : "fail";
 
@@ -127,7 +157,11 @@ public class PaymentController {
     // ---------------- CHECK PAYMENT STATUS ----------------
     @GetMapping("/status/{paymentId}")
     public ResponseEntity<String> getPaymentStatus(@PathVariable Long paymentId) {
+
         String status = paymentService.getPaymentStatus(paymentId);
+
+        System.out.println("PAYMENT STATUS (" + paymentId + "): " + status);
+
         return ResponseEntity.ok(status);
     }
 }
