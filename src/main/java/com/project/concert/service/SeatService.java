@@ -94,7 +94,7 @@ public class SeatService {
         seat.setLockedUntil(null);
         seatRepository.save(seat);
 
-        // update available seats in concert
+        //update available seats in concert
         Concert concert = seat.getConcert();
         if (concert.getAvailableSeats() != null) {
             concert.setAvailableSeats(concert.getAvailableSeats() - 1);

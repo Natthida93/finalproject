@@ -28,7 +28,7 @@ public class BookingService {
             if (seat.getStatus() == SeatStatus.BOOKED) {
                 throw new RuntimeException("Seat already booked: " + seat.getSeatNumber());
             }
-            // Optional: check if locked by this user
+            //check if locked by this user
             if (seat.getStatus() == SeatStatus.LOCKED &&
                     !user.getId().equals(seat.getLockedById()) &&
                     seat.getLockedUntil() != null &&
