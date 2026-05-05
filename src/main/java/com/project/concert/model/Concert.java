@@ -27,6 +27,8 @@ public class Concert {
 
     private String image;
 
+    private String category;
+
     private LocalDateTime startTime;
 
     @Column(name = "total_seats")
@@ -80,6 +82,10 @@ public class Concert {
         return sections;
     }
 
+    public String getCategory() {
+        return category;
+    }
+
     // ================= SETTERS =================
 
     public void setDate(LocalDate date) {
@@ -110,7 +116,9 @@ public class Concert {
         this.availableSeats = availableSeats;
     }
 
-
+    public void setCategory(String category) {
+        this.category = category;
+    }
     public void setSections(List<Section> sections) {
         this.sections.clear();
 

@@ -102,6 +102,32 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    // ================== EDIT OPERATIONS ==================
+    @PutMapping("/users/{id}")
+    public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody User updatedUser) {
+
+        Optional<User> optionalUser = userRepository.findById(id);
+
+        if (!optionalUser.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = optionalUser.get();
+
+        user.setFullName(updatedUser.getFullName());
+        user.setEmail(updatedUser.getEmail());
+        user.setAddress(updatedUser.getAddress());
+        user.setRole(updatedUser.getRole());
+
+
+        if (updatedUser.getPassword() != null) {
+            user.setPassword(updatedUser.getPassword());
+        }
+
+        userRepository.save(user);
+
+        return ResponseEntity.ok("User updated successfully");
+    }
     // ================== DELETE OPERATIONS ==================
     @DeleteMapping("/users/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
