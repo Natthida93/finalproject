@@ -149,6 +149,83 @@ public class AdminController {
         paymentRepository.deleteById(id);
         return ResponseEntity.ok("Payment deleted successfully");
     }
+    // ================== UPDATE BOOKING ==================
+    @PutMapping("/bookings/{id}")
+    public ResponseEntity<String> updateBooking(
+            @PathVariable Long id,
+            @RequestBody Booking updatedBooking
+    ) {
+        Optional<Booking> optionalBooking = bookingRepository.findById(id);
+
+        if (!optionalBooking.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Booking booking = optionalBooking.get();
+
+        // Update seats if provided
+        if (updatedBooking.getSeats() != null) {
+            booking.setSeats(updatedBooking.getSeats());
+        }
+
+        // Update payment relation if provided
+        if (updatedBooking.getPayment() != null &&
+                updatedBooking.getPayment().getId() != null) {
+
+            Optional<Payment> optionalPayment =
+                    paymentRepository.findById(updatedBooking.getPayment().getId());
+
+            if (optionalPayment.isPresent()) {
+                booking.setPayment(optionalPayment.get());
+            }
+        }
+
+        bookingRepository.save(booking);
+
+        return ResponseEntity.ok("Booking updated successfully");
+    }
+
+
+    // ================== UPDATE PAYMENT ==================
+    @PutMapping("/payments/{id}")
+    public ResponseEntity<String> updatePayment(
+            @PathVariable Long id,
+            @RequestBody Payment updatedPayment
+    ) {
+        Optional<Payment> optionalPayment = paymentRepository.findById(id);
+
+        if (!optionalPayment.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Payment payment = optionalPayment.get();
+
+        if (updatedPayment.getStatus() != null) {
+            payment.setStatus(updatedPayment.getStatus());
+        }
+
+        if (updatedPayment.getDeliveryMethod() != null) {
+            payment.setDeliveryMethod(updatedPayment.getDeliveryMethod());
+        }
+
+        if (updatedPayment.getPrice() != null) {
+            payment.setPrice(updatedPayment.getPrice());
+        }
+
+        paymentRepository.save(payment);
+
+        // Sync booking if payment completed
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            Booking booking = bookingRepository.findByPaymentId(payment.getId());
+
+            if (booking != null) {
+                booking.setPayment(payment);
+                bookingRepository.save(booking);
+            }
+        }
+
+        return ResponseEntity.ok("Payment updated successfully");
+    }
 
     // ================== STATS ==================
     @GetMapping("/stats")

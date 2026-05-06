@@ -39,4 +39,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByPaymentIdWithSeatsAndConcert(@Param("paymentId") Long paymentId);
 
 
+    Booking findByPaymentId(Long paymentId);
+
+
 }
