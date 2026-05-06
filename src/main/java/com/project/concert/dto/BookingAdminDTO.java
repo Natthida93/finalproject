@@ -10,8 +10,9 @@ public class BookingAdminDTO {
     public String userEmail;
     public String concertTitle;
     public List<String> seats;
-    public BigDecimal totalPrice;   // <-- changed from double to BigDecimal
+    public BigDecimal totalPrice;
     public String paymentStatus;
+    public Long paymentId;
     public LocalDateTime bookedAt;
 
     public BookingAdminDTO(Long id,
@@ -20,13 +21,14 @@ public class BookingAdminDTO {
                            List<String> seats,
                            BigDecimal totalPrice,
                            String paymentStatus,
-                           LocalDateTime bookedAt) {
+                           Long aLong, LocalDateTime bookedAt) {
         this.id = id;
         this.userEmail = userEmail;
         this.concertTitle = concertTitle;
         this.seats = seats;
         this.totalPrice = totalPrice;
         this.paymentStatus = paymentStatus;
+        this.paymentId = paymentId;
         this.bookedAt = bookedAt;
     }
 }

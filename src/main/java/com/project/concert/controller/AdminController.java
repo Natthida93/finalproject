@@ -71,8 +71,9 @@ public class AdminController {
                     b.getUser() != null ? b.getUser().getEmail() : "N/A",
                     b.getConcert() != null ? b.getConcert().getTitle() : "N/A",
                     seatNumbers,
-                    totalPrice,  // now passes BigDecimal directly
+                    totalPrice,
                     b.getPayment() != null ? b.getPayment().getStatus().name() : "N/A",
+                    b.getPayment() != null ? b.getPayment().getId() : null,
                     b.getBookedAt()
             ));
         }
